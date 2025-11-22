@@ -8,17 +8,17 @@
 #property version   "1.00"
 #property strict
 
-// Parametri input - Interfaccia
-input int Button_X = 170;          // Posizione X del bottone (dal bordo destro)
-input int Button_Y = 50;           // Posizione Y del bottone
-input int Button_Width = 150;      // Larghezza del bottone
-input int Button_Height = 30;      // Altezza del bottone
-input color Button_Color = clrRed; // Colore del bottone
-input color Text_Color = clrWhite; // Colore del testo
-
 // Parametri input - Risk Management
 input double DailyTakeProfit = 100;  // Daily Take Profit (0 = disabled)
 input double DailyStopLoss = 75;    // Daily Stop Loss (0 = disabled)
+
+// Parametri interfaccia - Valori fissi
+#define BUTTON_X 170          // Posizione X del bottone (dal bordo destro)
+#define BUTTON_Y 50           // Posizione Y del bottone
+#define BUTTON_WIDTH 150      // Larghezza del bottone
+#define BUTTON_HEIGHT 30      // Altezza del bottone
+#define BUTTON_COLOR clrRed   // Colore del bottone
+#define TEXT_COLOR clrWhite   // Colore del testo
 
 // Variabili globali - Sessione
 datetime sessionStartTime = 0;     // Tempo di inizio sessione
@@ -252,13 +252,13 @@ void CreateCloseButton()
 
    // Crea il bottone
    ObjectCreate(0, buttonName, OBJ_BUTTON, 0, 0, 0);
-   ObjectSetInteger(0, buttonName, OBJPROP_XDISTANCE, Button_X);
-   ObjectSetInteger(0, buttonName, OBJPROP_YDISTANCE, Button_Y);
-   ObjectSetInteger(0, buttonName, OBJPROP_XSIZE, Button_Width);
-   ObjectSetInteger(0, buttonName, OBJPROP_YSIZE, Button_Height);
+   ObjectSetInteger(0, buttonName, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, buttonName, OBJPROP_YDISTANCE, BUTTON_Y);
+   ObjectSetInteger(0, buttonName, OBJPROP_XSIZE, BUTTON_WIDTH);
+   ObjectSetInteger(0, buttonName, OBJPROP_YSIZE, BUTTON_HEIGHT);
    ObjectSetInteger(0, buttonName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, Button_Color);
-   ObjectSetInteger(0, buttonName, OBJPROP_COLOR, Text_Color);
+   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, BUTTON_COLOR);
+   ObjectSetInteger(0, buttonName, OBJPROP_COLOR, TEXT_COLOR);
    ObjectSetString(0, buttonName, OBJPROP_TEXT, "Close All");
    ObjectSetString(0, buttonName, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, buttonName, OBJPROP_FONTSIZE, 10);
@@ -277,8 +277,8 @@ void CreateTimerLabel()
 
    // Crea la label - allineata al lato destro del bottone
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, Button_X - 10);
-   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, Button_Y + Button_Height + 10);
+   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + BUTTON_HEIGHT + 10);
    ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_COLOR, clrYellow);
@@ -312,14 +312,13 @@ void UpdateSessionTimer()
 //+------------------------------------------------------------------+
 void CreateInfoLabels()
 {
-   int yPos = Button_Y + Button_Height + 35; // Posizione iniziale sotto il timer
+   int yPos = BUTTON_Y + BUTTON_HEIGHT + 35; // Posizione iniziale sotto il timer
    int lineHeight = 15; // Spaziatura tra le righe
-   int labelX = Button_X - 10; // Allineamento al lato destro del bottone
 
    // Balance
    ObjectDelete(0, balanceLabel);
    ObjectCreate(0, balanceLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, BUTTON_X);
    ObjectSetInteger(0, balanceLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, balanceLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, balanceLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -331,7 +330,7 @@ void CreateInfoLabels()
    // Equity
    ObjectDelete(0, equityLabel);
    ObjectCreate(0, equityLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, BUTTON_X);
    ObjectSetInteger(0, equityLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, equityLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, equityLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -343,7 +342,7 @@ void CreateInfoLabels()
    // Profit $
    ObjectDelete(0, profitLabel);
    ObjectCreate(0, profitLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, BUTTON_X);
    ObjectSetInteger(0, profitLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, profitLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, profitLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -355,7 +354,7 @@ void CreateInfoLabels()
    // Profit %
    ObjectDelete(0, profitPctLabel);
    ObjectCreate(0, profitPctLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, BUTTON_X);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -367,7 +366,7 @@ void CreateInfoLabels()
    // Loss $
    ObjectDelete(0, lossLabel);
    ObjectCreate(0, lossLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, BUTTON_X);
    ObjectSetInteger(0, lossLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, lossLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, lossLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -379,7 +378,7 @@ void CreateInfoLabels()
    // Loss %
    ObjectDelete(0, lossPctLabel);
    ObjectCreate(0, lossPctLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, BUTTON_X);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);

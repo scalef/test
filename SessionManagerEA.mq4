@@ -277,7 +277,7 @@ void CreateTimerLabel()
 
    // Crea la label - allineata al lato destro del bottone
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X - 5);
    ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + BUTTON_HEIGHT + 10);
    ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -314,11 +314,12 @@ void CreateInfoLabels()
 {
    int yPos = BUTTON_Y + BUTTON_HEIGHT + 35; // Posizione iniziale sotto il timer
    int lineHeight = 15; // Spaziatura tra le righe
+   int labelX = BUTTON_X - 5; // Offset per allineamento perfetto
 
    // Balance
    ObjectDelete(0, balanceLabel);
    ObjectCreate(0, balanceLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, labelX);
    ObjectSetInteger(0, balanceLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, balanceLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, balanceLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -330,7 +331,7 @@ void CreateInfoLabels()
    // Equity
    ObjectDelete(0, equityLabel);
    ObjectCreate(0, equityLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, labelX);
    ObjectSetInteger(0, equityLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, equityLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, equityLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -342,7 +343,7 @@ void CreateInfoLabels()
    // Profit $
    ObjectDelete(0, profitLabel);
    ObjectCreate(0, profitLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, labelX);
    ObjectSetInteger(0, profitLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, profitLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, profitLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -354,7 +355,7 @@ void CreateInfoLabels()
    // Profit %
    ObjectDelete(0, profitPctLabel);
    ObjectCreate(0, profitPctLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, labelX);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -366,7 +367,7 @@ void CreateInfoLabels()
    // Loss $
    ObjectDelete(0, lossLabel);
    ObjectCreate(0, lossLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, labelX);
    ObjectSetInteger(0, lossLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, lossLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, lossLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -378,7 +379,7 @@ void CreateInfoLabels()
    // Loss %
    ObjectDelete(0, lossPctLabel);
    ObjectCreate(0, lossPctLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, labelX);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);

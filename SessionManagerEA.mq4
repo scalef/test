@@ -220,15 +220,32 @@ void DisableAutoTrading()
 {
    // Nota: In MQL4, non è possibile disattivare direttamente il pulsante
    // "AutoTrading" dal codice per motivi di sicurezza.
-   // Tuttavia, possiamo fermare l'EA stesso.
+   // L'EA rimane sul grafico e l'utente deve disattivare manualmente l'AutoTrading.
 
-   Print("Trading automatico disattivato - EA fermato");
+   Print("Tutte le posizioni chiuse - Ricorda di disattivare l'AutoTrading manualmente");
 
-   // Mostra un alert all'utente
-   Alert("Tutte le posizioni sono state chiuse. Trading automatico disattivato.");
+   // Mostra un alert all'utente con le istruzioni
+   Alert("Tutte le posizioni sono state chiuse!\n\n" +
+         "IMPORTANTE: Disattiva manualmente il pulsante 'AutoTrading' nella toolbar di MT4\n" +
+         "per fermare completamente il trading automatico.");
 
-   // Opzionalmente, possiamo usare ExpertRemove() per rimuovere l'EA dal grafico
-   ExpertRemove();
+   // Cambia il colore del bottone per indicare che l'azione è completata
+   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrGray);
+   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Posizioni Chiuse");
+
+   // Aggiungi una label di promemoria
+   string reminderLabel = "AutoTradingReminder";
+   ObjectDelete(0, reminderLabel);
+   ObjectCreate(0, reminderLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, reminderLabel, OBJPROP_XDISTANCE, Button_X);
+   ObjectSetInteger(0, reminderLabel, OBJPROP_YDISTANCE, Button_Y + Button_Height + 40);
+   ObjectSetInteger(0, reminderLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, reminderLabel, OBJPROP_COLOR, clrOrange);
+   ObjectSetString(0, reminderLabel, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, reminderLabel, OBJPROP_FONTSIZE, 9);
+   ObjectSetString(0, reminderLabel, OBJPROP_TEXT, "⚠ Disattiva AutoTrading manualmente!");
+
+   ChartRedraw();
 }
 
 //+------------------------------------------------------------------+

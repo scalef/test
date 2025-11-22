@@ -46,8 +46,10 @@ L'EA offre diversi parametri che puoi modificare durante l'attivazione:
 ## Note importanti
 
 - L'EA chiude solo le posizioni del simbolo corrente (il grafico su cui è attivo)
-- Per motivi di sicurezza di MT4, l'EA non può disattivare fisicamente il pulsante "AutoTrading", ma si rimuove automaticamente dal grafico dopo la chiusura delle posizioni
+- **IMPORTANTE**: Per motivi di sicurezza, MT4 non permette agli EA di disattivare il pulsante "AutoTrading" via codice. Dopo aver cliccato "Chiudi Tutte", **dovrai disattivare manualmente** il pulsante "AutoTrading" nella toolbar di MT4
+- L'EA rimane sul grafico dopo la chiusura delle posizioni e mostra un promemoria visivo
 - Il timer si ferma quando vengono chiuse le posizioni
+- Il bottone diventa grigio e cambia testo in "Posizioni Chiuse" dopo l'operazione
 
 ## Requisiti
 

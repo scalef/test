@@ -355,10 +355,10 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
    string equityText = StringFormat("Equity: %.2f", currentEquity);
    ObjectSetString(0, equityLabel, OBJPROP_TEXT, equityText);
 
-   // Aggiorna Profitto/Perdita
+   // Aggiorna Profitto/Perdita - mostra sempre entrambi
    if(sessionPL >= 0)
    {
-      // Profitto
+      // Mostra profitto reale
       string profitText = StringFormat("Profitto: +%.2f", sessionPL);
       string profitPctText = StringFormat("(+%.2f%%)", sessionPLPercent);
 
@@ -367,13 +367,21 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
       ObjectSetInteger(0, profitLabel, OBJPROP_COLOR, clrLime);
       ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrLime);
 
-      // Nascondi label perdita
-      ObjectSetString(0, lossLabel, OBJPROP_TEXT, "");
-      ObjectSetString(0, lossPctLabel, OBJPROP_TEXT, "");
+      // Mostra perdita a zero
+      ObjectSetString(0, lossLabel, OBJPROP_TEXT, "Perdita: -0.00");
+      ObjectSetString(0, lossPctLabel, OBJPROP_TEXT, "(-0.00%)");
+      ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrGray);
+      ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrGray);
    }
    else
    {
-      // Perdita
+      // Mostra profitto a zero
+      ObjectSetString(0, profitLabel, OBJPROP_TEXT, "Profitto: +0.00");
+      ObjectSetString(0, profitPctLabel, OBJPROP_TEXT, "(+0.00%)");
+      ObjectSetInteger(0, profitLabel, OBJPROP_COLOR, clrGray);
+      ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrGray);
+
+      // Mostra perdita reale
       string lossText = StringFormat("Perdita: %.2f", sessionPL);
       string lossPctText = StringFormat("(%.2f%%)", sessionPLPercent);
 
@@ -381,10 +389,6 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
       ObjectSetString(0, lossPctLabel, OBJPROP_TEXT, lossPctText);
       ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrRed);
       ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrRed);
-
-      // Nascondi label profitto
-      ObjectSetString(0, profitLabel, OBJPROP_TEXT, "");
-      ObjectSetString(0, profitPctLabel, OBJPROP_TEXT, "");
    }
 
    ChartRedraw();

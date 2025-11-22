@@ -164,43 +164,42 @@ void CloseAllPositions()
    int total = OrdersTotal();
    int closed = 0;
 
-   Print("Totale ordini aperti: ", total);
+   Print("Totale ordini aperti su TUTTA MT4: ", total);
 
    // Cicla attraverso tutti gli ordini aperti (dal più recente al più vecchio)
    for(int i = total - 1; i >= 0; i--)
    {
       if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
       {
-         // Verifica che l'ordine appartenga al simbolo corrente
-         if(OrderSymbol() == Symbol())
+         bool result = false;
+         string orderSymbol = OrderSymbol();
+
+         if(OrderType() == OP_BUY)
          {
-            bool result = false;
+            // Chiudi posizione LONG - usa il Bid del simbolo dell'ordine
+            double closePrice = MarketInfo(orderSymbol, MODE_BID);
+            result = OrderClose(OrderTicket(), OrderLots(), closePrice, 3, clrNONE);
+         }
+         else if(OrderType() == OP_SELL)
+         {
+            // Chiudi posizione SHORT - usa l'Ask del simbolo dell'ordine
+            double closePrice = MarketInfo(orderSymbol, MODE_ASK);
+            result = OrderClose(OrderTicket(), OrderLots(), closePrice, 3, clrNONE);
+         }
+         else
+         {
+            // Elimina ordini pendenti
+            result = OrderDelete(OrderTicket());
+         }
 
-            if(OrderType() == OP_BUY)
-            {
-               // Chiudi posizione LONG
-               result = OrderClose(OrderTicket(), OrderLots(), Bid, 3, clrNONE);
-            }
-            else if(OrderType() == OP_SELL)
-            {
-               // Chiudi posizione SHORT
-               result = OrderClose(OrderTicket(), OrderLots(), Ask, 3, clrNONE);
-            }
-            else
-            {
-               // Elimina ordini pendenti
-               result = OrderDelete(OrderTicket());
-            }
-
-            if(result)
-            {
-               closed++;
-               Print("Ordine #", OrderTicket(), " chiuso con successo");
-            }
-            else
-            {
-               Print("Errore nella chiusura dell'ordine #", OrderTicket(), " - Errore: ", GetLastError());
-            }
+         if(result)
+         {
+            closed++;
+            Print("Ordine #", OrderTicket(), " (", orderSymbol, ") chiuso con successo");
+         }
+         else
+         {
+            Print("Errore nella chiusura dell'ordine #", OrderTicket(), " (", orderSymbol, ") - Errore: ", GetLastError());
          }
       }
    }
@@ -209,8 +208,53 @@ void CloseAllPositions()
 
    // Ferma la sessione
    sessionActive = false;
-   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Sessione terminata");
+   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Sessione terminata - Chiusura grafici...");
    ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per chiudere tutti i grafici aperti su MT4              |
+//+------------------------------------------------------------------+
+void CloseAllCharts()
+{
+   Print("Inizio chiusura di tutti i grafici...");
+
+   // Conta quanti grafici ci sono
+   int chartCount = 0;
+   long currentChartID = ChartFirst();
+
+   while(currentChartID >= 0)
+   {
+      chartCount++;
+      currentChartID = ChartNext(currentChartID);
+   }
+
+   Print("Trovati ", chartCount, " grafici aperti");
+
+   // Chiudi tutti i grafici tranne l'ultimo (altrimenti MT4 potrebbe crashare)
+   // Partiamo dal primo grafico
+   currentChartID = ChartFirst();
+   int closed = 0;
+
+   while(currentChartID >= 0)
+   {
+      long nextChartID = ChartNext(currentChartID);
+
+      // Chiudi il grafico corrente
+      if(ChartClose(currentChartID))
+      {
+         closed++;
+         Print("Grafico ID ", currentChartID, " chiuso");
+      }
+      else
+      {
+         Print("Impossibile chiudere grafico ID ", currentChartID);
+      }
+
+      currentChartID = nextChartID;
+   }
+
+   Print("Chiusura grafici completata. Grafici chiusi: ", closed, " su ", chartCount);
 }
 
 //+------------------------------------------------------------------+
@@ -220,32 +264,24 @@ void DisableAutoTrading()
 {
    // Nota: In MQL4, non è possibile disattivare direttamente il pulsante
    // "AutoTrading" dal codice per motivi di sicurezza.
-   // L'EA rimane sul grafico e l'utente deve disattivare manualmente l'AutoTrading.
 
-   Print("Tutte le posizioni chiuse - Ricorda di disattivare l'AutoTrading manualmente");
+   Print("Tutte le posizioni chiuse - Chiusura grafici in corso...");
 
-   // Mostra un alert all'utente con le istruzioni
-   Alert("Tutte le posizioni sono state chiuse!\n\n" +
-         "IMPORTANTE: Disattiva manualmente il pulsante 'AutoTrading' nella toolbar di MT4\n" +
-         "per fermare completamente il trading automatico.");
+   // Mostra un alert all'utente
+   Alert("Tutte le posizioni sono state chiuse!\n" +
+         "Tutti i grafici verranno chiusi tra 2 secondi.\n\n" +
+         "IMPORTANTE: Disattiva manualmente il pulsante 'AutoTrading' nella toolbar di MT4.");
 
    // Cambia il colore del bottone per indicare che l'azione è completata
    ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrGray);
-   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Posizioni Chiuse");
-
-   // Aggiungi una label di promemoria
-   string reminderLabel = "AutoTradingReminder";
-   ObjectDelete(0, reminderLabel);
-   ObjectCreate(0, reminderLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, reminderLabel, OBJPROP_XDISTANCE, Button_X);
-   ObjectSetInteger(0, reminderLabel, OBJPROP_YDISTANCE, Button_Y + Button_Height + 40);
-   ObjectSetInteger(0, reminderLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   ObjectSetInteger(0, reminderLabel, OBJPROP_COLOR, clrOrange);
-   ObjectSetString(0, reminderLabel, OBJPROP_FONT, "Arial Bold");
-   ObjectSetInteger(0, reminderLabel, OBJPROP_FONTSIZE, 9);
-   ObjectSetString(0, reminderLabel, OBJPROP_TEXT, "⚠ Disattiva AutoTrading manualmente!");
-
+   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Chiusura in corso...");
    ChartRedraw();
+
+   // Aspetta 2 secondi prima di chiudere i grafici (così l'utente può vedere l'alert)
+   Sleep(2000);
+
+   // Chiudi tutti i grafici
+   CloseAllCharts();
 }
 
 //+------------------------------------------------------------------+

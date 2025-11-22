@@ -174,6 +174,46 @@ void OnTimer()
    double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
 
    UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
+
+   // Verifica Take Profit giornaliero
+   if(DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit)
+   {
+      Print("========================================");
+      Print("TAKE PROFIT GIORNALIERO RAGGIUNTO!");
+      Print("Profitto: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
+      Print("Target TP: ", DoubleToString(DailyTakeProfit, 2));
+      Print("Chiusura automatica in corso...");
+      Print("========================================");
+
+      Alert("TAKE PROFIT RAGGIUNTO!\n" +
+            "Profitto: " + DoubleToString(sessionPL, 2) + " (" + DoubleToString(sessionPLPercent, 2) + "%)\n" +
+            "Chiusura automatica di tutte le posizioni e grafici...");
+
+      // Simula il click del bottone
+      CloseAllPositions();
+      DisableAutoTrading();
+      return;
+   }
+
+   // Verifica Stop Loss giornaliero
+   if(DailyStopLoss > 0 && sessionPL <= -DailyStopLoss)
+   {
+      Print("========================================");
+      Print("STOP LOSS GIORNALIERO RAGGIUNTO!");
+      Print("Perdita: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
+      Print("Target SL: -", DoubleToString(DailyStopLoss, 2));
+      Print("Chiusura automatica in corso...");
+      Print("========================================");
+
+      Alert("STOP LOSS RAGGIUNTO!\n" +
+            "Perdita: " + DoubleToString(sessionPL, 2) + " (" + DoubleToString(sessionPLPercent, 2) + "%)\n" +
+            "Chiusura automatica di tutte le posizioni e grafici...");
+
+      // Simula il click del bottone
+      CloseAllPositions();
+      DisableAutoTrading();
+      return;
+   }
 }
 
 //+------------------------------------------------------------------+

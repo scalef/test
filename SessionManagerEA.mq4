@@ -65,6 +65,9 @@ int OnInit()
       Print("Stop Loss giornaliero: ", DoubleToString(DailyStopLoss, 2));
    Print("========================================");
 
+   // Inizializza il pannello informativo con i valori iniziali
+   UpdateInfoPanel(sessionStartEquity, 0, 0);
+
    return(INIT_SUCCEEDED);
 }
 

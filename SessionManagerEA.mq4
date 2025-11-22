@@ -9,7 +9,7 @@
 #property strict
 
 // Parametri input - Interfaccia
-input int Button_X = 20;           // Posizione X del bottone
+input int Button_X = 170;          // Posizione X del bottone (dal bordo destro)
 input int Button_Y = 50;           // Posizione Y del bottone
 input int Button_Width = 150;      // Larghezza del bottone
 input int Button_Height = 30;      // Altezza del bottone

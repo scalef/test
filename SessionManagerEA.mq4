@@ -68,6 +68,9 @@ int OnInit()
    // Inizializza il pannello informativo con i valori iniziali
    UpdateInfoPanel(sessionStartEquity, 0, 0);
 
+   // Imposta timer per aggiornare il pannello ogni secondo
+   EventSetTimer(1);
+
    return(INIT_SUCCEEDED);
 }
 
@@ -76,6 +79,9 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   // Ferma il timer
+   EventKillTimer();
+
    // Rimuovi gli oggetti grafici
    ObjectDelete(0, buttonName);
    ObjectDelete(0, timerLabel);
@@ -148,6 +154,26 @@ void OnTick()
       DisableAutoTrading();
       return;
    }
+}
+
+//+------------------------------------------------------------------+
+//| Timer function - si esegue ogni secondo                          |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   // Se la sessione non è attiva, non fare nulla
+   if(!sessionActive)
+      return;
+
+   // Aggiorna il timer (ogni secondo)
+   UpdateSessionTimer();
+
+   // Calcola e aggiorna il pannello informativo
+   double currentEquity = AccountEquity();
+   double sessionPL = currentEquity - sessionStartEquity;
+   double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
+
+   UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
 }
 
 //+------------------------------------------------------------------+

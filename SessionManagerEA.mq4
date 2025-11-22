@@ -163,8 +163,15 @@ void CloseAllPositions()
 {
    int total = OrdersTotal();
    int closed = 0;
+   int failed = 0;
 
+   Print("========================================");
+   Print("INIZIO CHIUSURA POSIZIONI");
    Print("Totale ordini aperti su TUTTA MT4: ", total);
+   Print("========================================");
+
+   // Aggiorna i dati di mercato
+   RefreshRates();
 
    // Cicla attraverso tutti gli ordini aperti (dal più recente al più vecchio)
    for(int i = total - 1; i >= 0; i--)
@@ -173,43 +180,138 @@ void CloseAllPositions()
       {
          bool result = false;
          string orderSymbol = OrderSymbol();
+         int orderType = OrderType();
+         int ticket = OrderTicket();
+         double lots = OrderLots();
 
-         if(OrderType() == OP_BUY)
+         Print("---");
+         Print("Ordine #", ticket, " - Simbolo: ", orderSymbol, " - Tipo: ", orderType, " - Lotti: ", lots);
+
+         if(orderType == OP_BUY)
          {
             // Chiudi posizione LONG - usa il Bid del simbolo dell'ordine
-            double closePrice = MarketInfo(orderSymbol, MODE_BID);
-            result = OrderClose(OrderTicket(), OrderLots(), closePrice, 3, clrNONE);
+            double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_BID);
+
+            // Verifica che il prezzo sia valido
+            if(closePrice <= 0)
+            {
+               closePrice = MarketInfo(orderSymbol, MODE_BID);
+               Print("SymbolInfoDouble fallito, uso MarketInfo. Prezzo: ", closePrice);
+            }
+
+            if(closePrice > 0)
+            {
+               // Normalizza il prezzo
+               int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
+               closePrice = NormalizeDouble(closePrice, digits);
+
+               Print("Tentativo chiusura BUY - Prezzo: ", closePrice, " - Digits: ", digits);
+               result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
+            }
+            else
+            {
+               Print("ERRORE: Prezzo non valido per ", orderSymbol);
+            }
          }
-         else if(OrderType() == OP_SELL)
+         else if(orderType == OP_SELL)
          {
             // Chiudi posizione SHORT - usa l'Ask del simbolo dell'ordine
-            double closePrice = MarketInfo(orderSymbol, MODE_ASK);
-            result = OrderClose(OrderTicket(), OrderLots(), closePrice, 3, clrNONE);
+            double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_ASK);
+
+            // Verifica che il prezzo sia valido
+            if(closePrice <= 0)
+            {
+               closePrice = MarketInfo(orderSymbol, MODE_ASK);
+               Print("SymbolInfoDouble fallito, uso MarketInfo. Prezzo: ", closePrice);
+            }
+
+            if(closePrice > 0)
+            {
+               // Normalizza il prezzo
+               int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
+               closePrice = NormalizeDouble(closePrice, digits);
+
+               Print("Tentativo chiusura SELL - Prezzo: ", closePrice, " - Digits: ", digits);
+               result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
+            }
+            else
+            {
+               Print("ERRORE: Prezzo non valido per ", orderSymbol);
+            }
          }
          else
          {
-            // Elimina ordini pendenti
-            result = OrderDelete(OrderTicket());
+            // Elimina ordini pendenti (OP_BUYLIMIT, OP_SELLLIMIT, OP_BUYSTOP, OP_SELLSTOP)
+            Print("Tentativo eliminazione ordine pending tipo: ", orderType);
+            result = OrderDelete(ticket);
          }
 
          if(result)
          {
             closed++;
-            Print("Ordine #", OrderTicket(), " (", orderSymbol, ") chiuso con successo");
+            Print("✓ Ordine #", ticket, " (", orderSymbol, ") chiuso con successo");
          }
          else
          {
-            Print("Errore nella chiusura dell'ordine #", OrderTicket(), " (", orderSymbol, ") - Errore: ", GetLastError());
+            failed++;
+            int error = GetLastError();
+            Print("✗ ERRORE chiusura ordine #", ticket, " (", orderSymbol, ") - Codice errore: ", error);
+            Print("  Descrizione errore: ", ErrorDescription(error));
          }
       }
    }
 
-   Print("Chiusura completata. Ordini chiusi: ", closed, " su ", total);
+   Print("========================================");
+   Print("CHIUSURA COMPLETATA");
+   Print("Ordini chiusi: ", closed, " su ", total);
+   Print("Ordini falliti: ", failed);
+   Print("========================================");
 
    // Ferma la sessione
    sessionActive = false;
    ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Sessione terminata - Chiusura grafici...");
    ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per ottenere la descrizione degli errori                |
+//+------------------------------------------------------------------+
+string ErrorDescription(int error_code)
+{
+   switch(error_code)
+   {
+      case 0:   return "Nessun errore";
+      case 1:   return "Nessun errore, ma risultato sconosciuto";
+      case 2:   return "Errore comune";
+      case 3:   return "Parametri invalidi";
+      case 4:   return "Server di trading occupato";
+      case 5:   return "Vecchia versione del terminale client";
+      case 6:   return "Nessuna connessione con il server di trading";
+      case 7:   return "Non abbastanza diritti";
+      case 8:   return "Richieste troppo frequenti";
+      case 9:   return "Operazione non autorizzata";
+      case 64:  return "Account disabilitato";
+      case 65:  return "Numero di account invalido";
+      case 128: return "Timeout dell'ordine";
+      case 129: return "Prezzo invalido";
+      case 130: return "Stop invalidi";
+      case 131: return "Volume invalido";
+      case 132: return "Mercato chiuso";
+      case 133: return "Trading disabilitato";
+      case 134: return "Fondi insufficienti";
+      case 135: return "Prezzo cambiato";
+      case 136: return "Nessun prezzo";
+      case 137: return "Broker occupato";
+      case 138: return "Nuovi prezzi";
+      case 139: return "Ordine bloccato";
+      case 140: return "Trading consentito solo per posizioni lunghe";
+      case 141: return "Troppe richieste";
+      case 145: return "Modifica negata perché troppo vicino al mercato";
+      case 146: return "Sottosistema di trading occupato";
+      case 147: return "Uso della data di scadenza negato dal broker";
+      case 148: return "Numero di ordini aperti e pending raggiunto";
+      default:  return "Errore sconosciuto";
+   }
 }
 
 //+------------------------------------------------------------------+

@@ -17,8 +17,8 @@ input color Button_Color = clrRed; // Colore del bottone
 input color Text_Color = clrWhite; // Colore del testo
 
 // Parametri input - Risk Management
-input double DailyTakeProfit = 0;  // Take Profit giornaliero (0 = disabilitato)
-input double DailyStopLoss = 0;    // Stop Loss giornaliero (0 = disabilitato)
+input double DailyTakeProfit = 100;  // Daily Take Profit (0 = disabled)
+input double DailyStopLoss = 75;    // Daily Stop Loss (0 = disabled)
 
 // Variabili globali - Sessione
 datetime sessionStartTime = 0;     // Tempo di inizio sessione
@@ -256,10 +256,10 @@ void CreateCloseButton()
    ObjectSetInteger(0, buttonName, OBJPROP_YDISTANCE, Button_Y);
    ObjectSetInteger(0, buttonName, OBJPROP_XSIZE, Button_Width);
    ObjectSetInteger(0, buttonName, OBJPROP_YSIZE, Button_Height);
-   ObjectSetInteger(0, buttonName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, buttonName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, Button_Color);
    ObjectSetInteger(0, buttonName, OBJPROP_COLOR, Text_Color);
-   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Chiudi Tutte");
+   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Close All");
    ObjectSetString(0, buttonName, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, buttonName, OBJPROP_FONTSIZE, 10);
    ObjectSetInteger(0, buttonName, OBJPROP_SELECTABLE, false);
@@ -279,11 +279,12 @@ void CreateTimerLabel()
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, Button_Y + Button_Height + 10);
-   ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_COLOR, clrYellow);
    ObjectSetString(0, timerLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, timerLabel, OBJPROP_FONTSIZE, 10);
-   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Sessione: 00:00:00");
+   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Session: 00:00:00");
 
    ChartRedraw();
 }
@@ -300,7 +301,7 @@ void UpdateSessionTimer()
    int minutes = (elapsedSeconds % 3600) / 60;
    int seconds = elapsedSeconds % 60;
 
-   string timeStr = StringFormat("Sessione: %02d:%02d:%02d", hours, minutes, seconds);
+   string timeStr = StringFormat("Session: %02d:%02d:%02d", hours, minutes, seconds);
    ObjectSetString(0, timerLabel, OBJPROP_TEXT, timeStr);
 
    ChartRedraw();
@@ -319,7 +320,8 @@ void CreateInfoLabels()
    ObjectCreate(0, balanceLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, balanceLabel, OBJPROP_YDISTANCE, yPos);
-   ObjectSetInteger(0, balanceLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, balanceLabel, OBJPROP_COLOR, clrWhite);
    ObjectSetString(0, balanceLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, balanceLabel, OBJPROP_FONTSIZE, 9);
@@ -330,51 +332,56 @@ void CreateInfoLabels()
    ObjectCreate(0, equityLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, equityLabel, OBJPROP_YDISTANCE, yPos);
-   ObjectSetInteger(0, equityLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, equityLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, equityLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, equityLabel, OBJPROP_COLOR, clrWhite);
    ObjectSetString(0, equityLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, equityLabel, OBJPROP_FONTSIZE, 9);
    yPos += lineHeight + 5; // Spazio extra
 
-   // Profitto €
+   // Profit $
    ObjectDelete(0, profitLabel);
    ObjectCreate(0, profitLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, profitLabel, OBJPROP_YDISTANCE, yPos);
-   ObjectSetInteger(0, profitLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, profitLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, profitLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, profitLabel, OBJPROP_COLOR, clrLime);
    ObjectSetString(0, profitLabel, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, profitLabel, OBJPROP_FONTSIZE, 9);
    yPos += lineHeight;
 
-   // Profitto %
+   // Profit %
    ObjectDelete(0, profitPctLabel);
    ObjectCreate(0, profitPctLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_YDISTANCE, yPos);
-   ObjectSetInteger(0, profitPctLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrLime);
    ObjectSetString(0, profitPctLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, profitPctLabel, OBJPROP_FONTSIZE, 9);
    yPos += lineHeight + 5; // Spazio extra
 
-   // Perdita €
+   // Loss $
    ObjectDelete(0, lossLabel);
    ObjectCreate(0, lossLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, lossLabel, OBJPROP_YDISTANCE, yPos);
-   ObjectSetInteger(0, lossLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, lossLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, lossLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrRed);
    ObjectSetString(0, lossLabel, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, lossLabel, OBJPROP_FONTSIZE, 9);
    yPos += lineHeight;
 
-   // Perdita %
+   // Loss %
    ObjectDelete(0, lossPctLabel);
    ObjectCreate(0, lossPctLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_YDISTANCE, yPos);
-   ObjectSetInteger(0, lossPctLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrRed);
    ObjectSetString(0, lossPctLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, lossPctLabel, OBJPROP_FONTSIZE, 9);
@@ -395,11 +402,11 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
    string equityText = StringFormat("Equity: %.2f", currentEquity);
    ObjectSetString(0, equityLabel, OBJPROP_TEXT, equityText);
 
-   // Aggiorna Profitto/Perdita - mostra sempre entrambi
+   // Aggiorna Profit/Loss - mostra sempre entrambi
    if(sessionPL >= 0)
    {
       // Mostra profitto reale
-      string profitText = StringFormat("Profitto: +%.2f", sessionPL);
+      string profitText = StringFormat("Profit: +%.2f", sessionPL);
       string profitPctText = StringFormat("(+%.2f%%)", sessionPLPercent);
 
       ObjectSetString(0, profitLabel, OBJPROP_TEXT, profitText);
@@ -408,7 +415,7 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
       ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrLime);
 
       // Mostra perdita a zero
-      ObjectSetString(0, lossLabel, OBJPROP_TEXT, "Perdita: -0.00");
+      ObjectSetString(0, lossLabel, OBJPROP_TEXT, "Loss: -0.00");
       ObjectSetString(0, lossPctLabel, OBJPROP_TEXT, "(-0.00%)");
       ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrGray);
       ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrGray);
@@ -416,13 +423,13 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
    else
    {
       // Mostra profitto a zero
-      ObjectSetString(0, profitLabel, OBJPROP_TEXT, "Profitto: +0.00");
+      ObjectSetString(0, profitLabel, OBJPROP_TEXT, "Profit: +0.00");
       ObjectSetString(0, profitPctLabel, OBJPROP_TEXT, "(+0.00%)");
       ObjectSetInteger(0, profitLabel, OBJPROP_COLOR, clrGray);
       ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrGray);
 
       // Mostra perdita reale
-      string lossText = StringFormat("Perdita: %.2f", sessionPL);
+      string lossText = StringFormat("Loss: %.2f", sessionPL);
       string lossPctText = StringFormat("(%.2f%%)", sessionPLPercent);
 
       ObjectSetString(0, lossLabel, OBJPROP_TEXT, lossText);
@@ -547,7 +554,7 @@ void CloseAllPositions()
 
    // Ferma la sessione
    sessionActive = false;
-   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Sessione terminata - Chiusura grafici...");
+   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Session ended - Closing charts...");
    ChartRedraw();
 }
 
@@ -654,7 +661,7 @@ void DisableAutoTrading()
 
    // Cambia il colore del bottone per indicare che l'azione è completata
    ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrGray);
-   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Chiusura in corso...");
+   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Closing...");
    ChartRedraw();
 
    // Chiudi tutti i grafici immediatamente

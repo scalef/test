@@ -269,7 +269,7 @@ void DisableAutoTrading()
 
    // Mostra un alert all'utente
    Alert("Tutte le posizioni sono state chiuse!\n" +
-         "Tutti i grafici verranno chiusi tra 2 secondi.\n\n" +
+         "Chiusura immediata di tutti i grafici in corso.\n\n" +
          "IMPORTANTE: Disattiva manualmente il pulsante 'AutoTrading' nella toolbar di MT4.");
 
    // Cambia il colore del bottone per indicare che l'azione è completata
@@ -277,10 +277,7 @@ void DisableAutoTrading()
    ObjectSetString(0, buttonName, OBJPROP_TEXT, "Chiusura in corso...");
    ChartRedraw();
 
-   // Aspetta 2 secondi prima di chiudere i grafici (così l'utente può vedere l'alert)
-   Sleep(2000);
-
-   // Chiudi tutti i grafici
+   // Chiudi tutti i grafici immediatamente
    CloseAllCharts();
 }
 

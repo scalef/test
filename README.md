@@ -24,9 +24,9 @@ Expert Advisor per MT4 che gestisce sessioni di trading con controllo manuale de
 
 ### Chiusura delle posizioni
 - Clicca sul bottone "Chiudi Tutte" per chiudere immediatamente **TUTTE le posizioni aperte su MT4** (tutti i simboli/asset)
-- L'EA chiuderà sia le posizioni LONG che SHORT, oltre agli ordini pendenti
-- Dopo la chiusura delle posizioni, **tutti i grafici aperti verranno chiusi automaticamente** (dopo 2 secondi)
-- Riceverai un alert prima della chiusura dei grafici
+- L'EA chiuderà sia le posizioni running (in corso) che quelle pending (ordini pendenti)
+- Dopo la chiusura delle posizioni, **tutti i grafici aperti verranno chiusi istantaneamente**
+- Riceverai un alert al momento della chiusura
 
 ### Timer di sessione
 - Il timer mostra il tempo trascorso dall'attivazione dell'EA
@@ -47,11 +47,12 @@ L'EA offre diversi parametri che puoi modificare durante l'attivazione:
 ## Note importanti
 
 - ⚠️ **L'EA chiude TUTTE le posizioni su MT4** (non solo quelle del simbolo corrente) - usare con cautela!
-- ⚠️ **Tutti i grafici aperti su MT4 verranno chiusi** dopo la chiusura delle posizioni
+- ⚠️ **Tutti i grafici aperti su MT4 verranno chiusi istantaneamente** dopo la chiusura delle posizioni
 - **IMPORTANTE**: Per motivi di sicurezza, MT4 non permette agli EA di disattivare il pulsante "AutoTrading" via codice. Dopo la chiusura, **dovrai disattivare manualmente** il pulsante "AutoTrading" nella toolbar di MT4
+- Chiude sia posizioni running (BUY/SELL) che pending (ordini in attesa)
 - Il timer si ferma quando vengono chiuse le posizioni
-- Hai 2 secondi dopo l'alert per vedere il messaggio prima che i grafici vengano chiusi
 - Il bottone diventa grigio e mostra "Chiusura in corso..." durante l'operazione
+- La chiusura è istantanea e irreversibile
 
 ## Requisiti
 

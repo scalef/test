@@ -8,7 +8,7 @@
 #property version   "1.00"
 #property strict
 
-// Parametri input
+// Parametri input - Interfaccia
 input int Button_X = 20;           // Posizione X del bottone
 input int Button_Y = 50;           // Posizione Y del bottone
 input int Button_Width = 150;      // Larghezza del bottone
@@ -16,11 +16,25 @@ input int Button_Height = 30;      // Altezza del bottone
 input color Button_Color = clrRed; // Colore del bottone
 input color Text_Color = clrWhite; // Colore del testo
 
-// Variabili globali
+// Parametri input - Risk Management
+input double DailyTakeProfit = 0;  // Take Profit giornaliero (0 = disabilitato)
+input double DailyStopLoss = 0;    // Stop Loss giornaliero (0 = disabilitato)
+
+// Variabili globali - Sessione
 datetime sessionStartTime = 0;     // Tempo di inizio sessione
 bool sessionActive = false;        // Stato della sessione
+double sessionStartBalance = 0;    // Balance all'inizio della sessione
+double sessionStartEquity = 0;     // Equity all'inizio della sessione
+
+// Variabili globali - Oggetti grafici
 string buttonName = "CloseAllBtn"; // Nome del bottone
 string timerLabel = "SessionTimer"; // Nome label timer
+string balanceLabel = "BalanceLabel"; // Label balance
+string equityLabel = "EquityLabel";   // Label equity
+string profitLabel = "ProfitLabel";   // Label profitto
+string profitPctLabel = "ProfitPctLabel"; // Label profitto %
+string lossLabel = "LossLabel";       // Label perdita
+string lossPctLabel = "LossPctLabel"; // Label perdita %
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -30,14 +44,26 @@ int OnInit()
    // Crea il bottone per chiudere tutte le posizioni
    CreateCloseButton();
 
-   // Crea la label per il timer
+   // Crea le label del pannello informativo
    CreateTimerLabel();
+   CreateInfoLabels();
 
-   // Avvia la sessione
+   // Avvia la sessione e salva i valori iniziali
    sessionStartTime = TimeCurrent();
+   sessionStartBalance = AccountBalance();
+   sessionStartEquity = AccountEquity();
    sessionActive = true;
 
-   Print("Session Manager EA inizializzato - Sessione avviata");
+   Print("========================================");
+   Print("Session Manager EA inizializzato");
+   Print("Sessione avviata alle: ", TimeToString(sessionStartTime, TIME_DATE|TIME_MINUTES));
+   Print("Balance iniziale: ", DoubleToString(sessionStartBalance, 2));
+   Print("Equity iniziale: ", DoubleToString(sessionStartEquity, 2));
+   if(DailyTakeProfit > 0)
+      Print("Take Profit giornaliero: ", DoubleToString(DailyTakeProfit, 2));
+   if(DailyStopLoss > 0)
+      Print("Stop Loss giornaliero: ", DoubleToString(DailyStopLoss, 2));
+   Print("========================================");
 
    return(INIT_SUCCEEDED);
 }
@@ -50,6 +76,12 @@ void OnDeinit(const int reason)
    // Rimuovi gli oggetti grafici
    ObjectDelete(0, buttonName);
    ObjectDelete(0, timerLabel);
+   ObjectDelete(0, balanceLabel);
+   ObjectDelete(0, equityLabel);
+   ObjectDelete(0, profitLabel);
+   ObjectDelete(0, profitPctLabel);
+   ObjectDelete(0, lossLabel);
+   ObjectDelete(0, lossPctLabel);
 
    Print("Session Manager EA disattivato");
 }
@@ -59,10 +91,59 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
-   // Aggiorna il timer se la sessione è attiva
-   if(sessionActive)
+   // Se la sessione non è attiva, non fare nulla
+   if(!sessionActive)
+      return;
+
+   // Aggiorna il timer
+   UpdateSessionTimer();
+
+   // Calcola il P&L di sessione
+   double currentEquity = AccountEquity();
+   double sessionPL = currentEquity - sessionStartEquity;
+   double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
+
+   // Aggiorna il pannello informativo
+   UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
+
+   // Verifica Take Profit giornaliero
+   if(DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit)
    {
-      UpdateSessionTimer();
+      Print("========================================");
+      Print("TAKE PROFIT GIORNALIERO RAGGIUNTO!");
+      Print("Profitto: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
+      Print("Target TP: ", DoubleToString(DailyTakeProfit, 2));
+      Print("Chiusura automatica in corso...");
+      Print("========================================");
+
+      Alert("TAKE PROFIT RAGGIUNTO!\n" +
+            "Profitto: " + DoubleToString(sessionPL, 2) + " (" + DoubleToString(sessionPLPercent, 2) + "%)\n" +
+            "Chiusura automatica di tutte le posizioni e grafici...");
+
+      // Simula il click del bottone
+      CloseAllPositions();
+      DisableAutoTrading();
+      return;
+   }
+
+   // Verifica Stop Loss giornaliero
+   if(DailyStopLoss > 0 && sessionPL <= -DailyStopLoss)
+   {
+      Print("========================================");
+      Print("STOP LOSS GIORNALIERO RAGGIUNTO!");
+      Print("Perdita: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
+      Print("Target SL: -", DoubleToString(DailyStopLoss, 2));
+      Print("Chiusura automatica in corso...");
+      Print("========================================");
+
+      Alert("STOP LOSS RAGGIUNTO!\n" +
+            "Perdita: " + DoubleToString(sessionPL, 2) + " (" + DoubleToString(sessionPLPercent, 2) + "%)\n" +
+            "Chiusura automatica di tutte le posizioni e grafici...");
+
+      // Simula il click del bottone
+      CloseAllPositions();
+      DisableAutoTrading();
+      return;
    }
 }
 
@@ -152,6 +233,130 @@ void UpdateSessionTimer()
 
    string timeStr = StringFormat("Sessione: %02d:%02d:%02d", hours, minutes, seconds);
    ObjectSetString(0, timerLabel, OBJPROP_TEXT, timeStr);
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per creare le label del pannello informativo            |
+//+------------------------------------------------------------------+
+void CreateInfoLabels()
+{
+   int yPos = Button_Y + Button_Height + 35; // Posizione iniziale sotto il timer
+   int lineHeight = 15; // Spaziatura tra le righe
+
+   // Balance
+   ObjectDelete(0, balanceLabel);
+   ObjectCreate(0, balanceLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, Button_X);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_COLOR, clrWhite);
+   ObjectSetString(0, balanceLabel, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, balanceLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight;
+
+   // Equity
+   ObjectDelete(0, equityLabel);
+   ObjectCreate(0, equityLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, Button_X);
+   ObjectSetInteger(0, equityLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, equityLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, equityLabel, OBJPROP_COLOR, clrWhite);
+   ObjectSetString(0, equityLabel, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, equityLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight + 5; // Spazio extra
+
+   // Profitto €
+   ObjectDelete(0, profitLabel);
+   ObjectCreate(0, profitLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, Button_X);
+   ObjectSetInteger(0, profitLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, profitLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, profitLabel, OBJPROP_COLOR, clrLime);
+   ObjectSetString(0, profitLabel, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, profitLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight;
+
+   // Profitto %
+   ObjectDelete(0, profitPctLabel);
+   ObjectCreate(0, profitPctLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, Button_X);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrLime);
+   ObjectSetString(0, profitPctLabel, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight + 5; // Spazio extra
+
+   // Perdita €
+   ObjectDelete(0, lossLabel);
+   ObjectCreate(0, lossLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, Button_X);
+   ObjectSetInteger(0, lossLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, lossLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrRed);
+   ObjectSetString(0, lossLabel, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, lossLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight;
+
+   // Perdita %
+   ObjectDelete(0, lossPctLabel);
+   ObjectCreate(0, lossPctLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, Button_X);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrRed);
+   ObjectSetString(0, lossPctLabel, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_FONTSIZE, 9);
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per aggiornare il pannello informativo                  |
+//+------------------------------------------------------------------+
+void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPercent)
+{
+   // Aggiorna Balance
+   string balanceText = StringFormat("Balance: %.2f", AccountBalance());
+   ObjectSetString(0, balanceLabel, OBJPROP_TEXT, balanceText);
+
+   // Aggiorna Equity
+   string equityText = StringFormat("Equity: %.2f", currentEquity);
+   ObjectSetString(0, equityLabel, OBJPROP_TEXT, equityText);
+
+   // Aggiorna Profitto/Perdita
+   if(sessionPL >= 0)
+   {
+      // Profitto
+      string profitText = StringFormat("Profitto: +%.2f", sessionPL);
+      string profitPctText = StringFormat("(+%.2f%%)", sessionPLPercent);
+
+      ObjectSetString(0, profitLabel, OBJPROP_TEXT, profitText);
+      ObjectSetString(0, profitPctLabel, OBJPROP_TEXT, profitPctText);
+      ObjectSetInteger(0, profitLabel, OBJPROP_COLOR, clrLime);
+      ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrLime);
+
+      // Nascondi label perdita
+      ObjectSetString(0, lossLabel, OBJPROP_TEXT, "");
+      ObjectSetString(0, lossPctLabel, OBJPROP_TEXT, "");
+   }
+   else
+   {
+      // Perdita
+      string lossText = StringFormat("Perdita: %.2f", sessionPL);
+      string lossPctText = StringFormat("(%.2f%%)", sessionPLPercent);
+
+      ObjectSetString(0, lossLabel, OBJPROP_TEXT, lossText);
+      ObjectSetString(0, lossPctLabel, OBJPROP_TEXT, lossPctText);
+      ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrRed);
+      ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrRed);
+
+      // Nascondi label profitto
+      ObjectSetString(0, profitLabel, OBJPROP_TEXT, "");
+      ObjectSetString(0, profitPctLabel, OBJPROP_TEXT, "");
+   }
 
    ChartRedraw();
 }

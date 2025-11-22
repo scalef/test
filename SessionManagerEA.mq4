@@ -277,7 +277,7 @@ void CreateTimerLabel()
 
    // Crea la label - allineata al lato destro del bottone
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X - 5);
+   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X - 150);
    ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + BUTTON_HEIGHT + 10);
    ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
@@ -314,7 +314,7 @@ void CreateInfoLabels()
 {
    int yPos = BUTTON_Y + BUTTON_HEIGHT + 35; // Posizione iniziale sotto il timer
    int lineHeight = 15; // Spaziatura tra le righe
-   int labelX = BUTTON_X - 5; // Offset per allineamento perfetto
+   int labelX = BUTTON_X - 150; // Offset per allineamento perfetto
 
    // Balance
    ObjectDelete(0, balanceLabel);

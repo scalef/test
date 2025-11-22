@@ -277,10 +277,10 @@ void CreateTimerLabel()
 
    // Crea la label
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, Button_X - Button_Width + 5);
+   ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, Button_Y + Button_Height + 10);
    ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_COLOR, clrYellow);
    ObjectSetString(0, timerLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, timerLabel, OBJPROP_FONTSIZE, 10);
@@ -314,15 +314,14 @@ void CreateInfoLabels()
 {
    int yPos = Button_Y + Button_Height + 35; // Posizione iniziale sotto il timer
    int lineHeight = 15; // Spaziatura tra le righe
-   int labelX = Button_X - Button_Width + 5; // Allineamento a sinistra sotto il bottone
 
    // Balance
    ObjectDelete(0, balanceLabel);
    ObjectCreate(0, balanceLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, balanceLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, balanceLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, balanceLabel, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, balanceLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, balanceLabel, OBJPROP_COLOR, clrWhite);
    ObjectSetString(0, balanceLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, balanceLabel, OBJPROP_FONTSIZE, 9);
@@ -331,10 +330,10 @@ void CreateInfoLabels()
    // Equity
    ObjectDelete(0, equityLabel);
    ObjectCreate(0, equityLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, equityLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, equityLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, equityLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, equityLabel, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, equityLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, equityLabel, OBJPROP_COLOR, clrWhite);
    ObjectSetString(0, equityLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, equityLabel, OBJPROP_FONTSIZE, 9);
@@ -343,10 +342,10 @@ void CreateInfoLabels()
    // Profit $
    ObjectDelete(0, profitLabel);
    ObjectCreate(0, profitLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, profitLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, profitLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, profitLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, profitLabel, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, profitLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, profitLabel, OBJPROP_COLOR, clrLime);
    ObjectSetString(0, profitLabel, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, profitLabel, OBJPROP_FONTSIZE, 9);
@@ -355,10 +354,10 @@ void CreateInfoLabels()
    // Profit %
    ObjectDelete(0, profitPctLabel);
    ObjectCreate(0, profitPctLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, profitPctLabel, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, profitPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, profitPctLabel, OBJPROP_COLOR, clrLime);
    ObjectSetString(0, profitPctLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, profitPctLabel, OBJPROP_FONTSIZE, 9);
@@ -367,10 +366,10 @@ void CreateInfoLabels()
    // Loss $
    ObjectDelete(0, lossLabel);
    ObjectCreate(0, lossLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, lossLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, lossLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, lossLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, lossLabel, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, lossLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrRed);
    ObjectSetString(0, lossLabel, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, lossLabel, OBJPROP_FONTSIZE, 9);
@@ -379,10 +378,10 @@ void CreateInfoLabels()
    // Loss %
    ObjectDelete(0, lossPctLabel);
    ObjectCreate(0, lossPctLabel, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_XDISTANCE, Button_X);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_YDISTANCE, yPos);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, lossPctLabel, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, lossPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrRed);
    ObjectSetString(0, lossPctLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, lossPctLabel, OBJPROP_FONTSIZE, 9);

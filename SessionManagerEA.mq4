@@ -82,13 +82,6 @@ void OnDeinit(const int reason)
    // Ferma il timer
    EventKillTimer();
 
-   // Rimuovi la variabile globale se esiste
-   if(GlobalVariableCheck("SESSION_MANAGER_STOP"))
-   {
-      GlobalVariableDel("SESSION_MANAGER_STOP");
-      Print("Variabile globale SESSION_MANAGER_STOP rimossa");
-   }
-
    // Rimuovi gli oggetti grafici
    ObjectDelete(0, buttonName);
    ObjectDelete(0, timerLabel);
@@ -454,105 +447,72 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
 //+------------------------------------------------------------------+
 void CloseAllPositions()
 {
-   // Crea una variabile globale per segnalare agli altri EA di fermarsi
-   GlobalVariableSet("SESSION_MANAGER_STOP", 1);
    Print("========================================");
-   Print("Variabile globale SESSION_MANAGER_STOP creata");
-   Print("ATTENZIONE: Altri EA dovrebbero controllare questa variabile e fermarsi!");
+   Print("INIZIO CHIUSURA IMMEDIATA DI TUTTE LE POSIZIONI");
+   Print("Chiusura multipla in corso...");
    Print("========================================");
-
-   // Aspetta 2 secondi per dare tempo agli EA di vedere la variabile
-   Sleep(2000);
 
    int totalClosed = 0;
-   int maxAttempts = 3; // Prova a chiudere fino a 3 volte
+   int maxAttempts = 10; // Ripete 10 volte senza pause per battere EA che riaprono
 
    for(int attempt = 1; attempt <= maxAttempts; attempt++)
    {
+      RefreshRates(); // Aggiorna prezzi prima di ogni tentativo
+
       int total = OrdersTotal();
-
-      if(total == 0)
-      {
-         Print("Nessuna posizione aperta - Chiusura completata");
-         break;
-      }
-
-      Print("========================================");
-      Print("TENTATIVO ", attempt, " DI ", maxAttempts);
-      Print("Totale ordini aperti: ", total);
-      Print("========================================");
+      if(total == 0) break; // Nessun ordine, esci
 
       int closed = 0;
-      int failed = 0;
-
-      // Aggiorna i dati di mercato
-      RefreshRates();
 
       // Cicla attraverso tutti gli ordini aperti (dal più recente al più vecchio)
       for(int i = total - 1; i >= 0; i--)
       {
-         if(OrderSelect(i, SELECT_BY_POS, MODE_TRADES))
+         if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+
+         bool result = false;
+         string orderSymbol = OrderSymbol();
+         int orderType = OrderType();
+         int ticket = OrderTicket();
+         double lots = OrderLots();
+
+         if(orderType == OP_BUY)
          {
-            bool result = false;
-            string orderSymbol = OrderSymbol();
-            int orderType = OrderType();
-            int ticket = OrderTicket();
-            double lots = OrderLots();
+            double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_BID);
+            if(closePrice <= 0) closePrice = MarketInfo(orderSymbol, MODE_BID);
 
-            Print("Ordine #", ticket, " - ", orderSymbol, " - Tipo: ", orderType);
+            if(closePrice > 0)
+            {
+               int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
+               closePrice = NormalizeDouble(closePrice, digits);
+               result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
+            }
+         }
+         else if(orderType == OP_SELL)
+         {
+            double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_ASK);
+            if(closePrice <= 0) closePrice = MarketInfo(orderSymbol, MODE_ASK);
 
-            if(orderType == OP_BUY)
+            if(closePrice > 0)
             {
-               double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_BID);
-               if(closePrice <= 0) closePrice = MarketInfo(orderSymbol, MODE_BID);
+               int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
+               closePrice = NormalizeDouble(closePrice, digits);
+               result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
+            }
+         }
+         else
+         {
+            result = OrderDelete(ticket); // Ordini pending
+         }
 
-               if(closePrice > 0)
-               {
-                  int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
-                  closePrice = NormalizeDouble(closePrice, digits);
-                  result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
-               }
-            }
-            else if(orderType == OP_SELL)
-            {
-               double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_ASK);
-               if(closePrice <= 0) closePrice = MarketInfo(orderSymbol, MODE_ASK);
-
-               if(closePrice > 0)
-               {
-                  int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
-                  closePrice = NormalizeDouble(closePrice, digits);
-                  result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
-               }
-            }
-            else
-            {
-               result = OrderDelete(ticket);
-            }
-
-            if(result)
-            {
-               closed++;
-               totalClosed++;
-               Print("✓ Ordine #", ticket, " chiuso");
-            }
-            else
-            {
-               failed++;
-               Print("✗ ERRORE ordine #", ticket, " - Errore: ", GetLastError());
-            }
+         if(result)
+         {
+            closed++;
+            totalClosed++;
          }
       }
 
-      Print("Tentativo ", attempt, " completato - Chiusi: ", closed, " - Falliti: ", failed);
-
-      // Se ci sono ancora ordini e non è l'ultimo tentativo, aspetta un momento
-      if(OrdersTotal() > 0 && attempt < maxAttempts)
-      {
-         Print("Attesa 1 secondo prima del prossimo tentativo...");
-         Sleep(1000);
-         RefreshRates();
-      }
+      if(closed > 0)
+         Print("Tentativo ", attempt, ": chiusi ", closed, " ordini");
    }
 
    Print("========================================");
@@ -563,7 +523,7 @@ void CloseAllPositions()
 
    // Ferma la sessione
    sessionActive = false;
-   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Session ended - EAs stopped");
+   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Session ended - Disable AutoTrading NOW!");
    ChartRedraw();
 }
 
@@ -659,24 +619,23 @@ void CloseAllCharts()
 void DisableAutoTrading()
 {
    Print("========================================");
-   Print("DISATTIVAZIONE TRADING");
-   Print("Tutte le posizioni chiuse - I grafici rimangono aperti");
+   Print("DISATTIVAZIONE TRADING RICHIESTA");
    Print("========================================");
 
    // Mostra un alert all'utente
-   Alert("Tutte le posizioni sono state chiuse!\n\n" +
-         "I GRAFICI RIMANGONO APERTI (senza EA).\n\n" +
-         "IMPORTANTE:\n" +
-         "1. Disattiva manualmente il pulsante 'AutoTrading' nella toolbar di MT4\n" +
-         "2. Variabile globale SESSION_MANAGER_STOP creata per segnalare agli altri EA");
+   Alert("AZIONE RICHIESTA IMMEDIATA!\n\n" +
+         "Tutte le posizioni sono state chiuse.\n\n" +
+         "DISATTIVA SUBITO 'AutoTrading' dalla toolbar di MT4!\n" +
+         "(Altrimenti gli EA come Thanos continueranno ad aprire posizioni)\n\n" +
+         "I grafici rimangono aperti.");
 
    // Cambia il colore del bottone per indicare che l'azione è completata
-   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrGray);
-   ObjectSetString(0, buttonName, OBJPROP_TEXT, "Stopped");
+   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrOrange);
+   ObjectSetString(0, buttonName, OBJPROP_TEXT, "DISABLE NOW!");
+   ObjectSetInteger(0, buttonName, OBJPROP_FONTSIZE, 9);
    ChartRedraw();
 
-   // NON chiudiamo i grafici - li lasciamo aperti
-   Print("I grafici rimangono aperti. Sessione terminata.");
+   Print("IMPORTANTE: Disattiva manualmente AutoTrading per fermare gli altri EA!");
 }
 
 //+------------------------------------------------------------------+

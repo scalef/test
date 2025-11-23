@@ -567,9 +567,8 @@ void CloseAllPositions()
    Print("Ordini rimanenti: ", OrdersTotal());
    Print("========================================");
 
-   // Ferma la sessione
+   // Ferma la sessione (il timer rimane con il tempo finale)
    sessionActive = false;
-   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Session ended - All done!");
    ChartRedraw();
 }
 

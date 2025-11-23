@@ -443,38 +443,37 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
 }
 
 //+------------------------------------------------------------------+
-//| Funzione per chiudere i grafici con EA Thanos                    |
+//| Funzione per chiudere tutti i grafici tranne quello corrente     |
 //+------------------------------------------------------------------+
-void CloseThanoscharts()
+void CloseAllOtherCharts()
 {
    Print("========================================");
-   Print("RICERCA E CHIUSURA GRAFICI CON EA THANOS");
+   Print("CHIUSURA DI TUTTI I GRAFICI (tranne corrente)");
    Print("========================================");
 
    int closedCharts = 0;
+   long myChartID = ChartID(); // ID del grafico corrente (Session Manager)
    long currentChartID = ChartFirst();
 
    while(currentChartID >= 0)
    {
-      // Ottieni il nome dell'EA sul grafico
-      string expertName = ChartGetString(currentChartID, CHART_EXPERT_NAME);
-
       // Salva l'ID del prossimo grafico PRIMA di chiudere quello corrente
       long nextChartID = ChartNext(currentChartID);
 
-      // Se il nome dell'EA contiene "Thanos" (case-insensitive), chiudi il grafico
-      if(StringFind(expertName, "Thanos", 0) >= 0 || StringFind(expertName, "thanos", 0) >= 0)
+      // Chiudi tutti i grafici TRANNE quello corrente
+      if(currentChartID != myChartID)
       {
-         Print("Trovato EA Thanos su grafico ID ", currentChartID, " - Chiusura in corso...");
+         string symbol = ChartSymbol(currentChartID);
+         Print("Chiusura grafico ID ", currentChartID, " (", symbol, ")...");
 
          if(ChartClose(currentChartID))
          {
             closedCharts++;
-            Print("✓ Grafico ID ", currentChartID, " (", expertName, ") chiuso con successo");
+            Print("✓ Grafico ", symbol, " chiuso con successo");
          }
          else
          {
-            Print("✗ Impossibile chiudere grafico ID ", currentChartID);
+            Print("✗ Impossibile chiudere grafico ", symbol);
          }
       }
 
@@ -482,7 +481,8 @@ void CloseThanoscharts()
    }
 
    Print("========================================");
-   Print("Grafici Thanos chiusi: ", closedCharts);
+   Print("Grafici chiusi: ", closedCharts);
+   Print("Grafico Session Manager rimane aperto");
    Print("========================================");
 }
 
@@ -491,8 +491,8 @@ void CloseThanoscharts()
 //+------------------------------------------------------------------+
 void CloseAllPositions()
 {
-   // PASSO 1: Chiudi tutti i grafici con EA Thanos
-   CloseThanoscharts();
+   // PASSO 1: Chiudi tutti i grafici tranne quello corrente (elimina Thanos)
+   CloseAllOtherCharts();
 
    // PASSO 2: Chiudi tutte le posizioni
    Print("========================================");
@@ -670,9 +670,9 @@ void DisableAutoTrading()
 
    // Mostra un alert all'utente
    Alert("OPERAZIONE COMPLETATA!\n\n" +
-         "✓ Grafici con EA Thanos chiusi\n" +
+         "✓ Tutti i grafici chiusi (tranne Session Manager)\n" +
          "✓ Tutte le posizioni chiuse\n\n" +
-         "Gli altri grafici rimangono aperti.");
+         "EA Thanos rimosso!");
 
    // Cambia il colore del bottone per indicare che l'azione è completata
    ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrGreen);

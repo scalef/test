@@ -443,28 +443,74 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
 }
 
 //+------------------------------------------------------------------+
+//| Funzione per chiudere i grafici con EA Thanos                    |
+//+------------------------------------------------------------------+
+void CloseThanoscharts()
+{
+   Print("========================================");
+   Print("RICERCA E CHIUSURA GRAFICI CON EA THANOS");
+   Print("========================================");
+
+   int closedCharts = 0;
+   long currentChartID = ChartFirst();
+
+   while(currentChartID >= 0)
+   {
+      // Ottieni il nome dell'EA sul grafico
+      string expertName = ChartGetString(currentChartID, CHART_EXPERT_NAME);
+
+      // Salva l'ID del prossimo grafico PRIMA di chiudere quello corrente
+      long nextChartID = ChartNext(currentChartID);
+
+      // Se il nome dell'EA contiene "Thanos" (case-insensitive), chiudi il grafico
+      if(StringFind(expertName, "Thanos", 0) >= 0 || StringFind(expertName, "thanos", 0) >= 0)
+      {
+         Print("Trovato EA Thanos su grafico ID ", currentChartID, " - Chiusura in corso...");
+
+         if(ChartClose(currentChartID))
+         {
+            closedCharts++;
+            Print("✓ Grafico ID ", currentChartID, " (", expertName, ") chiuso con successo");
+         }
+         else
+         {
+            Print("✗ Impossibile chiudere grafico ID ", currentChartID);
+         }
+      }
+
+      currentChartID = nextChartID;
+   }
+
+   Print("========================================");
+   Print("Grafici Thanos chiusi: ", closedCharts);
+   Print("========================================");
+}
+
+//+------------------------------------------------------------------+
 //| Funzione per chiudere tutte le posizioni aperte                  |
 //+------------------------------------------------------------------+
 void CloseAllPositions()
 {
+   // PASSO 1: Chiudi tutti i grafici con EA Thanos
+   CloseThanoscharts();
+
+   // PASSO 2: Chiudi tutte le posizioni
    Print("========================================");
    Print("INIZIO CHIUSURA IMMEDIATA DI TUTTE LE POSIZIONI");
-   Print("Chiusura multipla in corso...");
    Print("========================================");
 
    int totalClosed = 0;
-   int maxAttempts = 10; // Ripete 10 volte senza pause per battere EA che riaprono
+   int maxAttempts = 5; // Ora solo 5 tentativi dato che Thanos è stato rimosso
 
    for(int attempt = 1; attempt <= maxAttempts; attempt++)
    {
-      RefreshRates(); // Aggiorna prezzi prima di ogni tentativo
+      RefreshRates();
 
       int total = OrdersTotal();
-      if(total == 0) break; // Nessun ordine, esci
+      if(total == 0) break;
 
       int closed = 0;
 
-      // Cicla attraverso tutti gli ordini aperti (dal più recente al più vecchio)
       for(int i = total - 1; i >= 0; i--)
       {
          if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
@@ -501,7 +547,7 @@ void CloseAllPositions()
          }
          else
          {
-            result = OrderDelete(ticket); // Ordini pending
+            result = OrderDelete(ticket);
          }
 
          if(result)
@@ -523,7 +569,7 @@ void CloseAllPositions()
 
    // Ferma la sessione
    sessionActive = false;
-   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Session ended - Disable AutoTrading NOW!");
+   ObjectSetString(0, timerLabel, OBJPROP_TEXT, "Session ended - All done!");
    ChartRedraw();
 }
 
@@ -619,23 +665,22 @@ void CloseAllCharts()
 void DisableAutoTrading()
 {
    Print("========================================");
-   Print("DISATTIVAZIONE TRADING RICHIESTA");
+   Print("OPERAZIONE COMPLETATA");
    Print("========================================");
 
    // Mostra un alert all'utente
-   Alert("AZIONE RICHIESTA IMMEDIATA!\n\n" +
-         "Tutte le posizioni sono state chiuse.\n\n" +
-         "DISATTIVA SUBITO 'AutoTrading' dalla toolbar di MT4!\n" +
-         "(Altrimenti gli EA come Thanos continueranno ad aprire posizioni)\n\n" +
-         "I grafici rimangono aperti.");
+   Alert("OPERAZIONE COMPLETATA!\n\n" +
+         "✓ Grafici con EA Thanos chiusi\n" +
+         "✓ Tutte le posizioni chiuse\n\n" +
+         "Gli altri grafici rimangono aperti.");
 
    // Cambia il colore del bottone per indicare che l'azione è completata
-   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrOrange);
-   ObjectSetString(0, buttonName, OBJPROP_TEXT, "DISABLE NOW!");
-   ObjectSetInteger(0, buttonName, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrGreen);
+   ObjectSetString(0, buttonName, OBJPROP_TEXT, "DONE!");
+   ObjectSetInteger(0, buttonName, OBJPROP_FONTSIZE, 10);
    ChartRedraw();
 
-   Print("IMPORTANTE: Disattiva manualmente AutoTrading per fermare gli altri EA!");
+   Print("Operazione completata con successo!");
 }
 
 //+------------------------------------------------------------------+

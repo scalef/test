@@ -52,6 +52,7 @@ string lossLabel = "LossLabel";       // Label perdita
 string lossPctLabel = "LossPctLabel"; // Label perdita %
 string maxDDLabel = "MaxDDLabel";     // Label max drawdown $
 string maxDDPctLabel = "MaxDDPctLabel"; // Label max drawdown %
+string trailingStopActiveLabel = "TrailingStopActiveLabel"; // Label trailing stop attivo
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -167,6 +168,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, lossPctLabel);
    ObjectDelete(0, maxDDLabel);
    ObjectDelete(0, maxDDPctLabel);
+   ObjectDelete(0, trailingStopActiveLabel);
 
    Print("Session Manager EA disattivato");
 }
@@ -607,6 +609,18 @@ void CreateInfoLabels()
    ObjectSetInteger(0, maxDDPctLabel, OBJPROP_COLOR, clrOrangeRed);
    ObjectSetString(0, maxDDPctLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, maxDDPctLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight + 5; // Spazio extra
+
+   // Trailing Stop Active
+   ObjectDelete(0, trailingStopActiveLabel);
+   ObjectCreate(0, trailingStopActiveLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+   ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_COLOR, clrYellow);
+   ObjectSetString(0, trailingStopActiveLabel, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_FONTSIZE, 9);
 
    ChartRedraw();
 }
@@ -670,6 +684,29 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
 
    ObjectSetString(0, maxDDLabel, OBJPROP_TEXT, maxDDText);
    ObjectSetString(0, maxDDPctLabel, OBJPROP_TEXT, maxDDPctText);
+
+   // Aggiorna Trailing Stop Active
+   string trailingStopText;
+   if(trailingStopLevel == 0)
+   {
+      trailingStopText = "Trailing Stop: None";
+      ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_COLOR, clrGray);
+   }
+   else
+   {
+      // Array dei livelli per ottenere il valore
+      double tpLevels[5];
+      tpLevels[0] = TP1;
+      tpLevels[1] = TP2;
+      tpLevels[2] = TP3;
+      tpLevels[3] = TP4;
+      tpLevels[4] = TP5;
+
+      double protectedLevel = tpLevels[trailingStopLevel - 1];
+      trailingStopText = StringFormat("Trailing Stop: TP%d (%.2f)", trailingStopLevel, protectedLevel);
+      ObjectSetInteger(0, trailingStopActiveLabel, OBJPROP_COLOR, clrYellow);
+   }
+   ObjectSetString(0, trailingStopActiveLabel, OBJPROP_TEXT, trailingStopText);
 
    ChartRedraw();
 }

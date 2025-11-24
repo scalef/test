@@ -30,7 +30,8 @@ double sessionMaxDrawdown = 0;     // Max drawdown in valore assoluto
 double sessionMaxDrawdownPercent = 0; // Max drawdown in percentuale
 
 // Variabili globali - Oggetti grafici
-string buttonName = "CloseAllBtn"; // Nome del bottone
+string buttonName = "CloseAllBtn"; // Nome del bottone principale
+string buttonStopName = "CloseAllStopBtn"; // Nome del bottone STOP
 string timerLabel = "SessionTimer"; // Nome label timer
 string balanceLabel = "BalanceLabel"; // Label balance
 string equityLabel = "EquityLabel";   // Label equity
@@ -46,8 +47,9 @@ string maxDDPctLabel = "MaxDDPctLabel"; // Label max drawdown %
 //+------------------------------------------------------------------+
 int OnInit()
 {
-   // Crea il bottone per chiudere tutte le posizioni
+   // Crea i bottoni
    CreateCloseButton();
+   CreateCloseStopButton();
 
    // Crea le label del pannello informativo
    CreateTimerLabel();
@@ -92,6 +94,7 @@ void OnDeinit(const int reason)
 
    // Rimuovi gli oggetti grafici
    ObjectDelete(0, buttonName);
+   ObjectDelete(0, buttonStopName);
    ObjectDelete(0, timerLabel);
    ObjectDelete(0, balanceLabel);
    ObjectDelete(0, equityLabel);
@@ -262,26 +265,35 @@ void OnChartEvent(const int id,
                   const double &dparam,
                   const string &sparam)
 {
-   // Controlla se è stato cliccato il bottone
+   // Controlla se è stato cliccato un bottone
    if(id == CHARTEVENT_OBJECT_CLICK)
    {
       if(sparam == buttonName)
       {
-         Print("Bottone premuto - Chiusura di tutte le posizioni...");
-         CloseAllPositions();
-
-         // Disattiva il trading automatico
-         DisableAutoTrading();
+         // Bottone "Close All" - chiude solo posizioni
+         Print("Bottone Close All premuto - Chiusura solo posizioni...");
+         ClosePositionsOnly();
 
          // Reset del bottone
          ObjectSetInteger(0, buttonName, OBJPROP_STATE, false);
+         ChartRedraw();
+      }
+      else if(sparam == buttonStopName)
+      {
+         // Bottone "Close All & STOP" - chiude tutto
+         Print("Bottone Close All & STOP premuto - Chiusura totale...");
+         CloseAllPositions();
+         DisableAutoTrading();
+
+         // Reset del bottone
+         ObjectSetInteger(0, buttonStopName, OBJPROP_STATE, false);
          ChartRedraw();
       }
    }
 }
 
 //+------------------------------------------------------------------+
-//| Funzione per creare il bottone                                   |
+//| Funzione per creare il bottone Close All (solo posizioni)        |
 //+------------------------------------------------------------------+
 void CreateCloseButton()
 {
@@ -295,12 +307,37 @@ void CreateCloseButton()
    ObjectSetInteger(0, buttonName, OBJPROP_XSIZE, BUTTON_WIDTH);
    ObjectSetInteger(0, buttonName, OBJPROP_YSIZE, BUTTON_HEIGHT);
    ObjectSetInteger(0, buttonName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, BUTTON_COLOR);
+   ObjectSetInteger(0, buttonName, OBJPROP_BGCOLOR, clrOrange);
    ObjectSetInteger(0, buttonName, OBJPROP_COLOR, TEXT_COLOR);
    ObjectSetString(0, buttonName, OBJPROP_TEXT, "Close All");
    ObjectSetString(0, buttonName, OBJPROP_FONT, "Arial Bold");
    ObjectSetInteger(0, buttonName, OBJPROP_FONTSIZE, 10);
    ObjectSetInteger(0, buttonName, OBJPROP_SELECTABLE, false);
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per creare il bottone Close All & STOP                  |
+//+------------------------------------------------------------------+
+void CreateCloseStopButton()
+{
+   // Elimina il bottone se esiste già
+   ObjectDelete(0, buttonStopName);
+
+   // Crea il bottone
+   ObjectCreate(0, buttonStopName, OBJ_BUTTON, 0, 0, 0);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_YDISTANCE, BUTTON_Y + BUTTON_HEIGHT + 5);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_XSIZE, BUTTON_WIDTH);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_YSIZE, BUTTON_HEIGHT);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_BGCOLOR, BUTTON_COLOR);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_COLOR, TEXT_COLOR);
+   ObjectSetString(0, buttonStopName, OBJPROP_TEXT, "Close All & STOP");
+   ObjectSetString(0, buttonStopName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, buttonStopName, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, buttonStopName, OBJPROP_SELECTABLE, false);
 
    ChartRedraw();
 }
@@ -316,7 +353,7 @@ void CreateTimerLabel()
    // Crea la label - allineata al lato destro del bottone
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X - 150);
-   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + BUTTON_HEIGHT + 10);
+   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + (BUTTON_HEIGHT * 2) + 15); // Sotto i due bottoni
    ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_COLOR, clrYellow);
@@ -350,7 +387,7 @@ void UpdateSessionTimer()
 //+------------------------------------------------------------------+
 void CreateInfoLabels()
 {
-   int yPos = BUTTON_Y + BUTTON_HEIGHT + 35; // Posizione iniziale sotto il timer
+   int yPos = BUTTON_Y + (BUTTON_HEIGHT * 2) + 40; // Posizione iniziale sotto il timer
    int lineHeight = 15; // Spaziatura tra le righe
    int labelX = BUTTON_X - 150; // Offset per allineamento perfetto
 
@@ -507,6 +544,92 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
 
    ObjectSetString(0, maxDDLabel, OBJPROP_TEXT, maxDDText);
    ObjectSetString(0, maxDDPctLabel, OBJPROP_TEXT, maxDDPctText);
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per chiudere solo le posizioni (senza fermare sessione) |
+//+------------------------------------------------------------------+
+void ClosePositionsOnly()
+{
+   Print("========================================");
+   Print("CHIUSURA SOLO POSIZIONI (sessione continua)");
+   Print("========================================");
+
+   int totalClosed = 0;
+   int maxAttempts = 5;
+
+   for(int attempt = 1; attempt <= maxAttempts; attempt++)
+   {
+      RefreshRates();
+
+      int total = OrdersTotal();
+      if(total == 0) break;
+
+      int closed = 0;
+
+      for(int i = total - 1; i >= 0; i--)
+      {
+         if(!OrderSelect(i, SELECT_BY_POS, MODE_TRADES)) continue;
+
+         bool result = false;
+         string orderSymbol = OrderSymbol();
+         int orderType = OrderType();
+         int ticket = OrderTicket();
+         double lots = OrderLots();
+
+         if(orderType == OP_BUY)
+         {
+            double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_BID);
+            if(closePrice <= 0) closePrice = MarketInfo(orderSymbol, MODE_BID);
+
+            if(closePrice > 0)
+            {
+               int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
+               closePrice = NormalizeDouble(closePrice, digits);
+               result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
+            }
+         }
+         else if(orderType == OP_SELL)
+         {
+            double closePrice = SymbolInfoDouble(orderSymbol, SYMBOL_ASK);
+            if(closePrice <= 0) closePrice = MarketInfo(orderSymbol, MODE_ASK);
+
+            if(closePrice > 0)
+            {
+               int digits = (int)MarketInfo(orderSymbol, MODE_DIGITS);
+               closePrice = NormalizeDouble(closePrice, digits);
+               result = OrderClose(ticket, lots, closePrice, 50, clrNONE);
+            }
+         }
+         else
+         {
+            result = OrderDelete(ticket);
+         }
+
+         if(result)
+         {
+            closed++;
+            totalClosed++;
+         }
+      }
+
+      if(closed > 0)
+         Print("Tentativo ", attempt, ": chiusi ", closed, " ordini");
+   }
+
+   Print("========================================");
+   Print("CHIUSURA POSIZIONI COMPLETATA");
+   Print("Totale ordini chiusi: ", totalClosed);
+   Print("Ordini rimanenti: ", OrdersTotal());
+   Print("Sessione continua...");
+   Print("========================================");
+
+   // La sessione NON viene fermata - continua a tracciare
+   Alert("Posizioni chiuse!\n\n" +
+         "Ordini chiusi: " + IntegerToString(totalClosed) + "\n" +
+         "La sessione continua...");
 
    ChartRedraw();
 }

@@ -55,20 +55,51 @@ int OnInit()
    CreateTimerLabel();
    CreateInfoLabels();
 
-   // Avvia la sessione e salva i valori iniziali
-   sessionStartTime = TimeCurrent();
-   sessionStartBalance = AccountBalance();
-   sessionStartEquity = AccountEquity();
-   sessionPeakEquity = sessionStartEquity; // Inizia dal valore iniziale
-   sessionMaxDrawdown = 0;
-   sessionMaxDrawdownPercent = 0;
-   sessionActive = true;
+   // Controlla se esistono dati di sessione salvati (cambio parametri)
+   if(GlobalVariableCheck("SM_SessionActive") && GlobalVariableGet("SM_SessionActive") > 0)
+   {
+      // Ripristina sessione esistente
+      sessionStartTime = (datetime)GlobalVariableGet("SM_SessionStartTime");
+      sessionStartBalance = GlobalVariableGet("SM_SessionStartBalance");
+      sessionStartEquity = GlobalVariableGet("SM_SessionStartEquity");
+      sessionPeakEquity = GlobalVariableGet("SM_SessionPeakEquity");
+      sessionMaxDrawdown = GlobalVariableGet("SM_SessionMaxDrawdown");
+      sessionMaxDrawdownPercent = GlobalVariableGet("SM_SessionMaxDrawdownPercent");
+      sessionActive = true;
 
-   Print("========================================");
-   Print("Session Manager EA inizializzato");
-   Print("Sessione avviata alle: ", TimeToString(sessionStartTime, TIME_DATE|TIME_MINUTES));
-   Print("Balance iniziale: ", DoubleToString(sessionStartBalance, 2));
-   Print("Equity iniziale: ", DoubleToString(sessionStartEquity, 2));
+      Print("========================================");
+      Print("Session Manager EA inizializzato");
+      Print("SESSIONE ESISTENTE RIPRISTINATA");
+      Print("Sessione avviata alle: ", TimeToString(sessionStartTime, TIME_DATE|TIME_MINUTES));
+      Print("Balance iniziale: ", DoubleToString(sessionStartBalance, 2));
+      Print("Equity iniziale: ", DoubleToString(sessionStartEquity, 2));
+      Print("Peak Equity: ", DoubleToString(sessionPeakEquity, 2));
+      Print("Max Drawdown: ", DoubleToString(sessionMaxDrawdown, 2));
+      Print("========================================");
+   }
+   else
+   {
+      // Avvia nuova sessione
+      sessionStartTime = TimeCurrent();
+      sessionStartBalance = AccountBalance();
+      sessionStartEquity = AccountEquity();
+      sessionPeakEquity = sessionStartEquity;
+      sessionMaxDrawdown = 0;
+      sessionMaxDrawdownPercent = 0;
+      sessionActive = true;
+
+      // Salva i dati iniziali
+      SaveSessionData();
+
+      Print("========================================");
+      Print("Session Manager EA inizializzato");
+      Print("NUOVA SESSIONE AVVIATA");
+      Print("Sessione avviata alle: ", TimeToString(sessionStartTime, TIME_DATE|TIME_MINUTES));
+      Print("Balance iniziale: ", DoubleToString(sessionStartBalance, 2));
+      Print("Equity iniziale: ", DoubleToString(sessionStartEquity, 2));
+      Print("========================================");
+   }
+
    if(DailyTakeProfit > 0)
       Print("Take Profit giornaliero: ", DoubleToString(DailyTakeProfit, 2));
    if(DailyStopLoss > 0)
@@ -76,7 +107,10 @@ int OnInit()
    Print("========================================");
 
    // Inizializza il pannello informativo con i valori iniziali
-   UpdateInfoPanel(sessionStartEquity, 0, 0);
+   double currentEquity = AccountEquity();
+   double sessionPL = currentEquity - sessionStartEquity;
+   double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
+   UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
 
    // Imposta timer per aggiornare il pannello ogni secondo
    EventSetTimer(1);
@@ -89,6 +123,19 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   // Salva i dati della sessione se è attiva (per ripristino dopo cambio parametri)
+   if(sessionActive)
+   {
+      SaveSessionData();
+      Print("Dati sessione salvati per ripristino");
+   }
+   else
+   {
+      // Sessione terminata - pulisci le variabili globali
+      CleanupSessionData();
+      Print("Dati sessione rimossi (sessione terminata)");
+   }
+
    // Ferma il timer
    EventKillTimer();
 
@@ -137,6 +184,9 @@ void OnTick()
    {
       sessionMaxDrawdown = currentDrawdown;
       sessionMaxDrawdownPercent = currentDrawdownPercent;
+
+      // Salva i dati aggiornati
+      SaveSessionData();
    }
 
    // Aggiorna il pannello informativo
@@ -212,6 +262,9 @@ void OnTimer()
    {
       sessionMaxDrawdown = currentDrawdown;
       sessionMaxDrawdownPercent = currentDrawdownPercent;
+
+      // Salva i dati aggiornati
+      SaveSessionData();
    }
 
    UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
@@ -549,6 +602,34 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
 }
 
 //+------------------------------------------------------------------+
+//| Funzione per salvare i dati della sessione                       |
+//+------------------------------------------------------------------+
+void SaveSessionData()
+{
+   GlobalVariableSet("SM_SessionStartTime", (double)sessionStartTime);
+   GlobalVariableSet("SM_SessionStartBalance", sessionStartBalance);
+   GlobalVariableSet("SM_SessionStartEquity", sessionStartEquity);
+   GlobalVariableSet("SM_SessionPeakEquity", sessionPeakEquity);
+   GlobalVariableSet("SM_SessionMaxDrawdown", sessionMaxDrawdown);
+   GlobalVariableSet("SM_SessionMaxDrawdownPercent", sessionMaxDrawdownPercent);
+   GlobalVariableSet("SM_SessionActive", sessionActive ? 1.0 : 0.0);
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per pulire i dati della sessione                        |
+//+------------------------------------------------------------------+
+void CleanupSessionData()
+{
+   GlobalVariableDel("SM_SessionStartTime");
+   GlobalVariableDel("SM_SessionStartBalance");
+   GlobalVariableDel("SM_SessionStartEquity");
+   GlobalVariableDel("SM_SessionPeakEquity");
+   GlobalVariableDel("SM_SessionMaxDrawdown");
+   GlobalVariableDel("SM_SessionMaxDrawdownPercent");
+   GlobalVariableDel("SM_SessionActive");
+}
+
+//+------------------------------------------------------------------+
 //| Funzione per chiudere solo le posizioni (senza fermare sessione) |
 //+------------------------------------------------------------------+
 void ClosePositionsOnly()
@@ -761,6 +842,10 @@ void CloseAllPositions()
 
    // Ferma la sessione (il timer rimane con il tempo finale)
    sessionActive = false;
+
+   // Pulisci i dati salvati (sessione terminata)
+   CleanupSessionData();
+
    ChartRedraw();
 }
 

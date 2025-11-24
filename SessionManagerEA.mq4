@@ -12,6 +12,13 @@
 input double DailyTakeProfit = 100;  // Daily Take Profit (0 = disabled)
 input double DailyStopLoss = 75;    // Daily Stop Loss (0 = disabled)
 
+// Parametri input - Trailing Stop Levels
+input double TP1 = 50;   // TP1 - Primo livello breakeven (0 = disabled)
+input double TP2 = 100;  // TP2 - Secondo livello breakeven (0 = disabled)
+input double TP3 = 200;  // TP3 - Terzo livello breakeven (0 = disabled)
+input double TP4 = 300;  // TP4 - Quarto livello breakeven (0 = disabled)
+input double TP5 = 500;  // TP5 - Quinto livello breakeven (0 = disabled)
+
 // Parametri interfaccia - Valori fissi
 #define BUTTON_X 170          // Posizione X del bottone (dal bordo destro)
 #define BUTTON_Y 50           // Posizione Y del bottone
@@ -28,6 +35,7 @@ double sessionStartEquity = 0;     // Equity all'inizio della sessione
 double sessionPeakEquity = 0;      // Picco massimo di equity raggiunto
 double sessionMaxDrawdown = 0;     // Max drawdown in valore assoluto
 double sessionMaxDrawdownPercent = 0; // Max drawdown in percentuale
+int trailingStopLevel = 0;         // Livello trailing stop raggiunto (0-5)
 
 // Variabili globali - Oggetti grafici
 string buttonName = "CloseAllBtn"; // Nome del bottone principale
@@ -68,6 +76,7 @@ int OnInit()
       sessionPeakEquity = GlobalVariableGet("SM_SessionPeakEquity");
       sessionMaxDrawdown = GlobalVariableGet("SM_SessionMaxDrawdown");
       sessionMaxDrawdownPercent = GlobalVariableGet("SM_SessionMaxDrawdownPercent");
+      trailingStopLevel = (int)GlobalVariableGet("SM_TrailingStopLevel");
       sessionActive = true;
 
       Print("========================================");
@@ -89,6 +98,7 @@ int OnInit()
       sessionPeakEquity = sessionStartEquity;
       sessionMaxDrawdown = 0;
       sessionMaxDrawdownPercent = 0;
+      trailingStopLevel = 0;
       sessionActive = true;
 
       // Salva i dati iniziali
@@ -197,6 +207,9 @@ void OnTick()
    // Aggiorna il pannello informativo
    UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
 
+   // Controlla i livelli di trailing stop
+   CheckTrailingStop(sessionPL);
+
    // Verifica Take Profit giornaliero
    if(DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit)
    {
@@ -273,6 +286,9 @@ void OnTimer()
    }
 
    UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
+
+   // Controlla i livelli di trailing stop
+   CheckTrailingStop(sessionPL);
 
    // Verifica Take Profit giornaliero
    if(DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit)
@@ -668,6 +684,7 @@ void SaveSessionData()
    GlobalVariableSet("SM_SessionPeakEquity", sessionPeakEquity);
    GlobalVariableSet("SM_SessionMaxDrawdown", sessionMaxDrawdown);
    GlobalVariableSet("SM_SessionMaxDrawdownPercent", sessionMaxDrawdownPercent);
+   GlobalVariableSet("SM_TrailingStopLevel", (double)trailingStopLevel);
    GlobalVariableSet("SM_SessionActive", sessionActive ? 1.0 : 0.0);
 }
 
@@ -682,6 +699,7 @@ void CleanupSessionData()
    GlobalVariableDel("SM_SessionPeakEquity");
    GlobalVariableDel("SM_SessionMaxDrawdown");
    GlobalVariableDel("SM_SessionMaxDrawdownPercent");
+   GlobalVariableDel("SM_TrailingStopLevel");
    GlobalVariableDel("SM_SessionActive");
 }
 
@@ -701,6 +719,7 @@ void ResetSessionStats()
    sessionPeakEquity = sessionStartEquity;
    sessionMaxDrawdown = 0;
    sessionMaxDrawdownPercent = 0;
+   trailingStopLevel = 0;
    sessionActive = true;
 
    // Salva i nuovi valori iniziali
@@ -724,6 +743,74 @@ void ResetSessionStats()
          "Nuova sessione iniziata!");
 
    ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per controllare i livelli di trailing stop              |
+//+------------------------------------------------------------------+
+void CheckTrailingStop(double sessionPL)
+{
+   // Array dei livelli TP in ordine
+   double tpLevels[5];
+   tpLevels[0] = TP1;
+   tpLevels[1] = TP2;
+   tpLevels[2] = TP3;
+   tpLevels[3] = TP4;
+   tpLevels[4] = TP5;
+
+   // Controlla se abbiamo raggiunto un nuovo livello (solo se in profitto)
+   if(sessionPL > 0)
+   {
+      for(int i = 4; i >= 0; i--)  // Controlla dal più alto al più basso
+      {
+         if(tpLevels[i] > 0 && sessionPL >= tpLevels[i] && trailingStopLevel < (i + 1))
+         {
+            trailingStopLevel = i + 1;
+            SaveSessionData();
+
+            Print("========================================");
+            Print("TRAILING STOP ATTIVATO - Livello ", trailingStopLevel);
+            Print("Profit corrente: ", DoubleToString(sessionPL, 2));
+            Print("Nuovo Stop Loss protetto: ", DoubleToString(tpLevels[i], 2));
+            Print("========================================");
+
+            Alert("Trailing Stop Attivato!\n\n" +
+                  "Livello: TP", IntegerToString(trailingStopLevel), "\n" +
+                  "Profit: ", DoubleToString(sessionPL, 2), "\n" +
+                  "Stop Loss protetto: ", DoubleToString(tpLevels[i], 2), "\n\n" +
+                  "Le tue posizioni sono ora protette!");
+
+            break;  // Esci dopo aver trovato il livello più alto raggiunto
+         }
+      }
+   }
+
+   // Controlla se il profit è sceso sotto il livello protetto
+   if(trailingStopLevel > 0)
+   {
+      double protectedLevel = tpLevels[trailingStopLevel - 1];
+
+      if(sessionPL < protectedLevel)
+      {
+         Print("========================================");
+         Print("TRAILING STOP TRIGGERED!");
+         Print("Profit corrente: ", DoubleToString(sessionPL, 2));
+         Print("Stop Loss protetto: ", DoubleToString(protectedLevel, 2));
+         Print("Chiusura automatica posizioni...");
+         Print("========================================");
+
+         Alert("Trailing Stop Triggered!\n\n" +
+               "Profit sceso sotto ", DoubleToString(protectedLevel, 2), "\n" +
+               "Chiusura automatica in corso...");
+
+         // Reset del livello prima di chiudere (per evitare loop)
+         trailingStopLevel = 0;
+         SaveSessionData();
+
+         // Chiude solo le posizioni (simulazione tasto arancione)
+         ClosePositionsOnly();
+      }
+   }
 }
 
 //+------------------------------------------------------------------+

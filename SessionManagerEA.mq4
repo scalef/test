@@ -32,6 +32,7 @@ double sessionMaxDrawdownPercent = 0; // Max drawdown in percentuale
 // Variabili globali - Oggetti grafici
 string buttonName = "CloseAllBtn"; // Nome del bottone principale
 string buttonStopName = "CloseAllStopBtn"; // Nome del bottone STOP
+string buttonResetName = "ResetStatsBtn"; // Nome del bottone RESET
 string timerLabel = "SessionTimer"; // Nome label timer
 string balanceLabel = "BalanceLabel"; // Label balance
 string equityLabel = "EquityLabel";   // Label equity
@@ -50,6 +51,7 @@ int OnInit()
    // Crea i bottoni
    CreateCloseButton();
    CreateCloseStopButton();
+   CreateResetButton();
 
    // Crea le label del pannello informativo
    CreateTimerLabel();
@@ -142,6 +144,7 @@ void OnDeinit(const int reason)
    // Rimuovi gli oggetti grafici
    ObjectDelete(0, buttonName);
    ObjectDelete(0, buttonStopName);
+   ObjectDelete(0, buttonResetName);
    ObjectDelete(0, timerLabel);
    ObjectDelete(0, balanceLabel);
    ObjectDelete(0, equityLabel);
@@ -342,6 +345,16 @@ void OnChartEvent(const int id,
          ObjectSetInteger(0, buttonStopName, OBJPROP_STATE, false);
          ChartRedraw();
       }
+      else if(sparam == buttonResetName)
+      {
+         // Bottone "Reset Stats" - resetta statistiche
+         Print("Bottone Reset Stats premuto - Reset statistiche...");
+         ResetSessionStats();
+
+         // Reset del bottone
+         ObjectSetInteger(0, buttonResetName, OBJPROP_STATE, false);
+         ChartRedraw();
+      }
    }
 }
 
@@ -396,6 +409,31 @@ void CreateCloseStopButton()
 }
 
 //+------------------------------------------------------------------+
+//| Funzione per creare il bottone Reset Stats                       |
+//+------------------------------------------------------------------+
+void CreateResetButton()
+{
+   // Elimina il bottone se esiste già
+   ObjectDelete(0, buttonResetName);
+
+   // Crea il bottone
+   ObjectCreate(0, buttonResetName, OBJ_BUTTON, 0, 0, 0);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_YDISTANCE, BUTTON_Y + (BUTTON_HEIGHT * 2) + 10);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_XSIZE, BUTTON_WIDTH);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_YSIZE, BUTTON_HEIGHT);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_BGCOLOR, clrDodgerBlue);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_COLOR, TEXT_COLOR);
+   ObjectSetString(0, buttonResetName, OBJPROP_TEXT, "Reset Stats");
+   ObjectSetString(0, buttonResetName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, buttonResetName, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, buttonResetName, OBJPROP_SELECTABLE, false);
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
 //| Funzione per creare la label del timer                           |
 //+------------------------------------------------------------------+
 void CreateTimerLabel()
@@ -406,7 +444,7 @@ void CreateTimerLabel()
    // Crea la label - allineata al lato destro del bottone
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X - 150);
-   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + (BUTTON_HEIGHT * 2) + 15); // Sotto i due bottoni
+   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + (BUTTON_HEIGHT * 3) + 20); // Sotto i tre bottoni
    ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_COLOR, clrYellow);
@@ -440,7 +478,7 @@ void UpdateSessionTimer()
 //+------------------------------------------------------------------+
 void CreateInfoLabels()
 {
-   int yPos = BUTTON_Y + (BUTTON_HEIGHT * 2) + 40; // Posizione iniziale sotto il timer
+   int yPos = BUTTON_Y + (BUTTON_HEIGHT * 3) + 45; // Posizione iniziale sotto il timer
    int lineHeight = 15; // Spaziatura tra le righe
    int labelX = BUTTON_X - 150; // Offset per allineamento perfetto
 
@@ -627,6 +665,47 @@ void CleanupSessionData()
    GlobalVariableDel("SM_SessionMaxDrawdown");
    GlobalVariableDel("SM_SessionMaxDrawdownPercent");
    GlobalVariableDel("SM_SessionActive");
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per resettare le statistiche della sessione             |
+//+------------------------------------------------------------------+
+void ResetSessionStats()
+{
+   Print("========================================");
+   Print("RESET STATISTICHE SESSIONE");
+   Print("========================================");
+
+   // Resetta tutti i valori della sessione
+   sessionStartTime = TimeCurrent();
+   sessionStartBalance = AccountBalance();
+   sessionStartEquity = AccountEquity();
+   sessionPeakEquity = sessionStartEquity;
+   sessionMaxDrawdown = 0;
+   sessionMaxDrawdownPercent = 0;
+   sessionActive = true;
+
+   // Salva i nuovi valori iniziali
+   SaveSessionData();
+
+   Print("Nuova sessione avviata alle: ", TimeToString(sessionStartTime, TIME_DATE|TIME_MINUTES));
+   Print("Balance iniziale: ", DoubleToString(sessionStartBalance, 2));
+   Print("Equity iniziale: ", DoubleToString(sessionStartEquity, 2));
+   Print("========================================");
+
+   // Aggiorna il pannello
+   double currentEquity = AccountEquity();
+   double sessionPL = currentEquity - sessionStartEquity;
+   double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
+   UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
+
+   Alert("Statistiche resettate!\n\n" +
+         "Timer: 00:00:00\n" +
+         "Max DD: 0.00\n" +
+         "Profit/Loss: 0.00\n\n" +
+         "Nuova sessione iniziata!");
+
+   ChartRedraw();
 }
 
 //+------------------------------------------------------------------+

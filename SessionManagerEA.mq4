@@ -796,23 +796,38 @@ void CheckTrailingStop(double sessionPL)
 
       if(sessionPL < protectedLevel)
       {
-         Print("========================================");
-         Print("TRAILING STOP TRIGGERED!");
-         Print("Profit corrente: ", DoubleToString(sessionPL, 2));
-         Print("Stop Loss protetto: ", DoubleToString(protectedLevel, 2));
-         Print("Chiusura automatica posizioni...");
-         Print("========================================");
+         // Controlla se ci sono posizioni aperte prima di triggerare
+         int totalOrders = 0;
+         for(int j = 0; j < OrdersTotal(); j++)
+         {
+            if(OrderSelect(j, SELECT_BY_POS, MODE_TRADES))
+            {
+               if(OrderType() == OP_BUY || OrderType() == OP_SELL)
+                  totalOrders++;
+            }
+         }
 
-         Alert("Trailing Stop Triggered!\n\n" +
-               "Profit sceso sotto ", DoubleToString(protectedLevel, 2), "\n" +
-               "Chiusura automatica in corso...");
+         // Triggera solo se ci sono posizioni da chiudere
+         if(totalOrders > 0)
+         {
+            Print("========================================");
+            Print("TRAILING STOP TRIGGERED!");
+            Print("Profit corrente: ", DoubleToString(sessionPL, 2));
+            Print("Stop Loss protetto: ", DoubleToString(protectedLevel, 2));
+            Print("Posizioni aperte: ", totalOrders);
+            Print("Chiusura automatica posizioni...");
+            Print("========================================");
 
-         // Reset del livello prima di chiudere (per evitare loop)
-         trailingStopLevel = 0;
-         SaveSessionData();
+            Alert("Trailing Stop Triggered!\n\n" +
+                  "Profit sceso sotto ", DoubleToString(protectedLevel, 2), "\n" +
+                  "Chiusura automatica in corso...");
 
-         // Chiude solo le posizioni (simulazione tasto arancione)
-         ClosePositionsOnly();
+            // NON resettare il livello - continua a proteggere
+            // Il livello rimane attivo per proteggere anche le nuove posizioni
+
+            // Chiude solo le posizioni (simulazione tasto arancione)
+            ClosePositionsOnly();
+         }
       }
    }
 }

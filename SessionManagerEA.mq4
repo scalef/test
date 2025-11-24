@@ -18,6 +18,7 @@ input double TP2 = 100;  // TP2 - Secondo livello breakeven (0 = disabled)
 input double TP3 = 200;  // TP3 - Terzo livello breakeven (0 = disabled)
 input double TP4 = 300;  // TP4 - Quarto livello breakeven (0 = disabled)
 input double TP5 = 500;  // TP5 - Quinto livello breakeven (0 = disabled)
+input double ActivationOffset = 10;  // Offset attivazione: raggiungi TP+N per attivare SL a TP
 
 // Parametri interfaccia - Valori fissi
 #define BUTTON_X 170          // Posizione X del bottone (dal bordo destro)
@@ -763,7 +764,8 @@ void CheckTrailingStop(double sessionPL)
    {
       for(int i = 4; i >= 0; i--)  // Controlla dal più alto al più basso
       {
-         if(tpLevels[i] > 0 && sessionPL >= tpLevels[i] && trailingStopLevel < (i + 1))
+         // Attiva il trailing stop quando raggiungi TP + ActivationOffset
+         if(tpLevels[i] > 0 && sessionPL >= (tpLevels[i] + ActivationOffset) && trailingStopLevel < (i + 1))
          {
             trailingStopLevel = i + 1;
             SaveSessionData();
@@ -771,12 +773,14 @@ void CheckTrailingStop(double sessionPL)
             Print("========================================");
             Print("TRAILING STOP ATTIVATO - Livello ", trailingStopLevel);
             Print("Profit corrente: ", DoubleToString(sessionPL, 2));
-            Print("Nuovo Stop Loss protetto: ", DoubleToString(tpLevels[i], 2));
+            Print("Soglia attivazione: ", DoubleToString(tpLevels[i] + ActivationOffset, 2));
+            Print("Stop Loss protetto: ", DoubleToString(tpLevels[i], 2));
             Print("========================================");
 
             Alert("Trailing Stop Attivato!\n\n" +
                   "Livello: TP", IntegerToString(trailingStopLevel), "\n" +
                   "Profit: ", DoubleToString(sessionPL, 2), "\n" +
+                  "Attivato a: ", DoubleToString(tpLevels[i] + ActivationOffset, 2), "\n" +
                   "Stop Loss protetto: ", DoubleToString(tpLevels[i], 2), "\n\n" +
                   "Le tue posizioni sono ora protette!");
 

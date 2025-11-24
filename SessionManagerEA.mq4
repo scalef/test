@@ -25,6 +25,9 @@ datetime sessionStartTime = 0;     // Tempo di inizio sessione
 bool sessionActive = false;        // Stato della sessione
 double sessionStartBalance = 0;    // Balance all'inizio della sessione
 double sessionStartEquity = 0;     // Equity all'inizio della sessione
+double sessionPeakEquity = 0;      // Picco massimo di equity raggiunto
+double sessionMaxDrawdown = 0;     // Max drawdown in valore assoluto
+double sessionMaxDrawdownPercent = 0; // Max drawdown in percentuale
 
 // Variabili globali - Oggetti grafici
 string buttonName = "CloseAllBtn"; // Nome del bottone
@@ -35,6 +38,8 @@ string profitLabel = "ProfitLabel";   // Label profitto
 string profitPctLabel = "ProfitPctLabel"; // Label profitto %
 string lossLabel = "LossLabel";       // Label perdita
 string lossPctLabel = "LossPctLabel"; // Label perdita %
+string maxDDLabel = "MaxDDLabel";     // Label max drawdown $
+string maxDDPctLabel = "MaxDDPctLabel"; // Label max drawdown %
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -52,6 +57,9 @@ int OnInit()
    sessionStartTime = TimeCurrent();
    sessionStartBalance = AccountBalance();
    sessionStartEquity = AccountEquity();
+   sessionPeakEquity = sessionStartEquity; // Inizia dal valore iniziale
+   sessionMaxDrawdown = 0;
+   sessionMaxDrawdownPercent = 0;
    sessionActive = true;
 
    Print("========================================");
@@ -91,6 +99,8 @@ void OnDeinit(const int reason)
    ObjectDelete(0, profitPctLabel);
    ObjectDelete(0, lossLabel);
    ObjectDelete(0, lossPctLabel);
+   ObjectDelete(0, maxDDLabel);
+   ObjectDelete(0, maxDDPctLabel);
 
    Print("Session Manager EA disattivato");
 }
@@ -111,6 +121,20 @@ void OnTick()
    double currentEquity = AccountEquity();
    double sessionPL = currentEquity - sessionStartEquity;
    double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
+
+   // Aggiorna picco equity e calcola drawdown
+   if(currentEquity > sessionPeakEquity)
+      sessionPeakEquity = currentEquity;
+
+   double currentDrawdown = sessionPeakEquity - currentEquity;
+   double currentDrawdownPercent = (sessionPeakEquity > 0) ? (currentDrawdown / sessionPeakEquity * 100.0) : 0;
+
+   // Aggiorna max drawdown se necessario
+   if(currentDrawdown > sessionMaxDrawdown)
+   {
+      sessionMaxDrawdown = currentDrawdown;
+      sessionMaxDrawdownPercent = currentDrawdownPercent;
+   }
 
    // Aggiorna il pannello informativo
    UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
@@ -172,6 +196,20 @@ void OnTimer()
    double currentEquity = AccountEquity();
    double sessionPL = currentEquity - sessionStartEquity;
    double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
+
+   // Aggiorna picco equity e calcola drawdown
+   if(currentEquity > sessionPeakEquity)
+      sessionPeakEquity = currentEquity;
+
+   double currentDrawdown = sessionPeakEquity - currentEquity;
+   double currentDrawdownPercent = (sessionPeakEquity > 0) ? (currentDrawdown / sessionPeakEquity * 100.0) : 0;
+
+   // Aggiorna max drawdown se necessario
+   if(currentDrawdown > sessionMaxDrawdown)
+   {
+      sessionMaxDrawdown = currentDrawdown;
+      sessionMaxDrawdownPercent = currentDrawdownPercent;
+   }
 
    UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
 
@@ -386,6 +424,30 @@ void CreateInfoLabels()
    ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrRed);
    ObjectSetString(0, lossPctLabel, OBJPROP_FONT, "Arial");
    ObjectSetInteger(0, lossPctLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight + 5; // Spazio extra
+
+   // Max Drawdown $
+   ObjectDelete(0, maxDDLabel);
+   ObjectCreate(0, maxDDLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, maxDDLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, maxDDLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, maxDDLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, maxDDLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+   ObjectSetInteger(0, maxDDLabel, OBJPROP_COLOR, clrOrangeRed);
+   ObjectSetString(0, maxDDLabel, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, maxDDLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight;
+
+   // Max Drawdown %
+   ObjectDelete(0, maxDDPctLabel);
+   ObjectCreate(0, maxDDPctLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, maxDDPctLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, maxDDPctLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, maxDDPctLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, maxDDPctLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+   ObjectSetInteger(0, maxDDPctLabel, OBJPROP_COLOR, clrOrangeRed);
+   ObjectSetString(0, maxDDPctLabel, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, maxDDPctLabel, OBJPROP_FONTSIZE, 9);
 
    ChartRedraw();
 }
@@ -438,6 +500,13 @@ void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPer
       ObjectSetInteger(0, lossLabel, OBJPROP_COLOR, clrRed);
       ObjectSetInteger(0, lossPctLabel, OBJPROP_COLOR, clrRed);
    }
+
+   // Aggiorna Max Drawdown - sempre visibile
+   string maxDDText = StringFormat("Max DD: -%.2f", sessionMaxDrawdown);
+   string maxDDPctText = StringFormat("(-%.2f%%)", sessionMaxDrawdownPercent);
+
+   ObjectSetString(0, maxDDLabel, OBJPROP_TEXT, maxDDText);
+   ObjectSetString(0, maxDDPctLabel, OBJPROP_TEXT, maxDDPctText);
 
    ChartRedraw();
 }

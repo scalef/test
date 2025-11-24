@@ -34,6 +34,7 @@ string buttonName = "CloseAllBtn"; // Nome del bottone principale
 string buttonStopName = "CloseAllStopBtn"; // Nome del bottone STOP
 string buttonResetName = "ResetStatsBtn"; // Nome del bottone RESET
 string timerLabel = "SessionTimer"; // Nome label timer
+string startingBalanceLabel = "StartingBalanceLabel"; // Label starting balance
 string balanceLabel = "BalanceLabel"; // Label balance
 string equityLabel = "EquityLabel";   // Label equity
 string profitLabel = "ProfitLabel";   // Label profitto
@@ -146,6 +147,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, buttonStopName);
    ObjectDelete(0, buttonResetName);
    ObjectDelete(0, timerLabel);
+   ObjectDelete(0, startingBalanceLabel);
    ObjectDelete(0, balanceLabel);
    ObjectDelete(0, equityLabel);
    ObjectDelete(0, profitLabel);
@@ -482,6 +484,18 @@ void CreateInfoLabels()
    int lineHeight = 15; // Spaziatura tra le righe
    int labelX = BUTTON_X - 150; // Offset per allineamento perfetto
 
+   // Starting Balance
+   ObjectDelete(0, startingBalanceLabel);
+   ObjectCreate(0, startingBalanceLabel, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, startingBalanceLabel, OBJPROP_XDISTANCE, labelX);
+   ObjectSetInteger(0, startingBalanceLabel, OBJPROP_YDISTANCE, yPos);
+   ObjectSetInteger(0, startingBalanceLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, startingBalanceLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+   ObjectSetInteger(0, startingBalanceLabel, OBJPROP_COLOR, clrGold);
+   ObjectSetString(0, startingBalanceLabel, OBJPROP_FONT, "Arial");
+   ObjectSetInteger(0, startingBalanceLabel, OBJPROP_FONTSIZE, 9);
+   yPos += lineHeight;
+
    // Balance
    ObjectDelete(0, balanceLabel);
    ObjectCreate(0, balanceLabel, OBJ_LABEL, 0, 0, 0);
@@ -585,6 +599,10 @@ void CreateInfoLabels()
 //+------------------------------------------------------------------+
 void UpdateInfoPanel(double currentEquity, double sessionPL, double sessionPLPercent)
 {
+   // Aggiorna Starting Balance
+   string startingBalanceText = StringFormat("Starting Balance: %.2f", sessionStartBalance);
+   ObjectSetString(0, startingBalanceLabel, OBJPROP_TEXT, startingBalanceText);
+
    // Aggiorna Balance
    string balanceText = StringFormat("Balance: %.2f", AccountBalance());
    ObjectSetString(0, balanceLabel, OBJPROP_TEXT, balanceText);

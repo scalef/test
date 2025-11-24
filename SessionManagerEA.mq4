@@ -19,6 +19,7 @@ input double TP3 = 200;  // TP3 - Terzo livello breakeven (0 = disabled)
 input double TP4 = 300;  // TP4 - Quarto livello breakeven (0 = disabled)
 input double TP5 = 500;  // TP5 - Quinto livello breakeven (0 = disabled)
 input double ActivationOffset = 10;  // Offset attivazione: raggiungi TP+N per attivare SL a TP
+input int TriggerCooldown = 30;  // Cooldown trigger (secondi): tempo minimo tra due trigger consecutivi
 
 // Parametri interfaccia - Valori fissi
 #define BUTTON_X 170          // Posizione X del bottone (dal bordo destro)
@@ -37,6 +38,7 @@ double sessionPeakEquity = 0;      // Picco massimo di equity raggiunto
 double sessionMaxDrawdown = 0;     // Max drawdown in valore assoluto
 double sessionMaxDrawdownPercent = 0; // Max drawdown in percentuale
 int trailingStopLevel = 0;         // Livello trailing stop raggiunto (0-5)
+datetime lastTriggerTime = 0;      // Timestamp dell'ultimo trigger
 
 // Variabili globali - Oggetti grafici
 string buttonName = "CloseAllBtn"; // Nome del bottone principale
@@ -79,6 +81,7 @@ int OnInit()
       sessionMaxDrawdown = GlobalVariableGet("SM_SessionMaxDrawdown");
       sessionMaxDrawdownPercent = GlobalVariableGet("SM_SessionMaxDrawdownPercent");
       trailingStopLevel = (int)GlobalVariableGet("SM_TrailingStopLevel");
+      lastTriggerTime = (datetime)GlobalVariableGet("SM_LastTriggerTime");
       sessionActive = true;
 
       Print("========================================");
@@ -101,6 +104,7 @@ int OnInit()
       sessionMaxDrawdown = 0;
       sessionMaxDrawdownPercent = 0;
       trailingStopLevel = 0;
+      lastTriggerTime = 0;
       sessionActive = true;
 
       // Salva i dati iniziali
@@ -723,6 +727,7 @@ void SaveSessionData()
    GlobalVariableSet("SM_SessionMaxDrawdown", sessionMaxDrawdown);
    GlobalVariableSet("SM_SessionMaxDrawdownPercent", sessionMaxDrawdownPercent);
    GlobalVariableSet("SM_TrailingStopLevel", (double)trailingStopLevel);
+   GlobalVariableSet("SM_LastTriggerTime", (double)lastTriggerTime);
    GlobalVariableSet("SM_SessionActive", sessionActive ? 1.0 : 0.0);
 }
 
@@ -738,6 +743,7 @@ void CleanupSessionData()
    GlobalVariableDel("SM_SessionMaxDrawdown");
    GlobalVariableDel("SM_SessionMaxDrawdownPercent");
    GlobalVariableDel("SM_TrailingStopLevel");
+   GlobalVariableDel("SM_LastTriggerTime");
    GlobalVariableDel("SM_SessionActive");
 }
 
@@ -758,6 +764,7 @@ void ResetSessionStats()
    sessionMaxDrawdown = 0;
    sessionMaxDrawdownPercent = 0;
    trailingStopLevel = 0;
+   lastTriggerTime = 0;
    sessionActive = true;
 
    // Salva i nuovi valori iniziali
@@ -831,39 +838,55 @@ void CheckTrailingStop(double sessionPL)
    {
       double protectedLevel = tpLevels[trailingStopLevel - 1];
 
-      if(sessionPL < protectedLevel)
+      // Triggera SOLO se:
+      // 1. Profit è sotto il livello protetto
+      // 2. Profit è ancora positivo (sessionPL > 0)
+      // 3. È passato abbastanza tempo dall'ultimo trigger (cooldown)
+      if(sessionPL < protectedLevel && sessionPL > 0)
       {
-         // Controlla se ci sono posizioni aperte prima di triggerare
-         int totalOrders = 0;
-         for(int j = 0; j < OrdersTotal(); j++)
+         // Controlla cooldown (tempo dall'ultimo trigger)
+         int secondsSinceLastTrigger = (int)(TimeCurrent() - lastTriggerTime);
+         bool cooldownPassed = (secondsSinceLastTrigger >= TriggerCooldown) || (lastTriggerTime == 0);
+
+         if(cooldownPassed)
          {
-            if(OrderSelect(j, SELECT_BY_POS, MODE_TRADES))
+            // Controlla se ci sono posizioni aperte prima di triggerare
+            int totalOrders = 0;
+            for(int j = 0; j < OrdersTotal(); j++)
             {
-               if(OrderType() == OP_BUY || OrderType() == OP_SELL)
-                  totalOrders++;
+               if(OrderSelect(j, SELECT_BY_POS, MODE_TRADES))
+               {
+                  if(OrderType() == OP_BUY || OrderType() == OP_SELL)
+                     totalOrders++;
+               }
             }
-         }
 
-         // Triggera solo se ci sono posizioni da chiudere
-         if(totalOrders > 0)
-         {
-            Print("========================================");
-            Print("TRAILING STOP TRIGGERED!");
-            Print("Profit corrente: ", DoubleToString(sessionPL, 2));
-            Print("Stop Loss protetto: ", DoubleToString(protectedLevel, 2));
-            Print("Posizioni aperte: ", totalOrders);
-            Print("Chiusura automatica posizioni...");
-            Print("========================================");
+            // Triggera solo se ci sono posizioni da chiudere
+            if(totalOrders > 0)
+            {
+               Print("========================================");
+               Print("TRAILING STOP TRIGGERED!");
+               Print("Profit corrente: ", DoubleToString(sessionPL, 2));
+               Print("Stop Loss protetto: ", DoubleToString(protectedLevel, 2));
+               Print("Posizioni aperte: ", totalOrders);
+               Print("Secondi dall'ultimo trigger: ", secondsSinceLastTrigger);
+               Print("Chiusura automatica posizioni...");
+               Print("========================================");
 
-            Alert("Trailing Stop Triggered!\n\n" +
-                  "Profit sceso sotto ", DoubleToString(protectedLevel, 2), "\n" +
-                  "Chiusura automatica in corso...");
+               Alert("Trailing Stop Triggered!\n\n" +
+                     "Profit sceso sotto ", DoubleToString(protectedLevel, 2), "\n" +
+                     "Chiusura automatica in corso...");
 
-            // NON resettare il livello - continua a proteggere
-            // Il livello rimane attivo per proteggere anche le nuove posizioni
+               // Salva il timestamp del trigger per il cooldown
+               lastTriggerTime = TimeCurrent();
+               SaveSessionData();
 
-            // Chiude solo le posizioni (simulazione tasto arancione)
-            ClosePositionsOnly();
+               // NON resettare il livello - continua a proteggere
+               // Il livello rimane attivo per proteggere anche le nuove posizioni
+
+               // Chiude solo le posizioni (simulazione tasto arancione)
+               ClosePositionsOnly();
+            }
          }
       }
    }

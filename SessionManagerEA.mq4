@@ -9,16 +9,16 @@
 #property strict
 
 // Parametri input - Risk Management
-input double DailyTakeProfit = 100;  // Daily Take Profit (0 = disabled)
-input double DailyStopLoss = 75;    // Daily Stop Loss (0 = disabled)
+input double DailyTakeProfit = 500;  // Daily Take Profit (0 = disabled)
+input double DailyStopLoss = 500;    // Daily Stop Loss (0 = disabled)
 
 // Parametri input - Trailing Stop Levels
-input double TP1 = 50;   // TP1 - Primo livello breakeven (0 = disabled)
-input double TP2 = 100;  // TP2 - Secondo livello breakeven (0 = disabled)
+input double TP1 = 100;   // TP1 - Primo livello breakeven (0 = disabled)
+input double TP2 = 150;  // TP2 - Secondo livello breakeven (0 = disabled)
 input double TP3 = 200;  // TP3 - Terzo livello breakeven (0 = disabled)
 input double TP4 = 300;  // TP4 - Quarto livello breakeven (0 = disabled)
 input double TP5 = 500;  // TP5 - Quinto livello breakeven (0 = disabled)
-input double ActivationOffset = 10;  // Offset attivazione: raggiungi TP+N per attivare SL a TP
+input double ActivationOffset = 100;  // Offset attivazione: raggiungi TP+N per attivare SL a TP
 
 // Parametri interfaccia - Valori fissi
 #define BUTTON_X 170          // Posizione X del bottone (dal bordo destro)

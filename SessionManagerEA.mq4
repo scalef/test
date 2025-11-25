@@ -42,6 +42,7 @@ int trailingStopLevel = 0;         // Livello trailing stop raggiunto (0-5)
 string buttonName = "CloseAllBtn"; // Nome del bottone principale
 string buttonStopName = "CloseAllStopBtn"; // Nome del bottone STOP
 string buttonResetName = "ResetStatsBtn"; // Nome del bottone RESET
+string buttonResetTSName = "ResetTrailingStopBtn"; // Nome del bottone RESET TRAILING STOP
 string timerLabel = "SessionTimer"; // Nome label timer
 string startingBalanceLabel = "StartingBalanceLabel"; // Label starting balance
 string balanceLabel = "BalanceLabel"; // Label balance
@@ -63,6 +64,7 @@ int OnInit()
    CreateCloseButton();
    CreateCloseStopButton();
    CreateResetButton();
+   CreateResetTSButton();
 
    // Crea le label del pannello informativo
    CreateTimerLabel();
@@ -158,6 +160,7 @@ void OnDeinit(const int reason)
    ObjectDelete(0, buttonName);
    ObjectDelete(0, buttonStopName);
    ObjectDelete(0, buttonResetName);
+   ObjectDelete(0, buttonResetTSName);
    ObjectDelete(0, timerLabel);
    ObjectDelete(0, startingBalanceLabel);
    ObjectDelete(0, balanceLabel);
@@ -376,6 +379,16 @@ void OnChartEvent(const int id,
          ObjectSetInteger(0, buttonResetName, OBJPROP_STATE, false);
          ChartRedraw();
       }
+      else if(sparam == buttonResetTSName)
+      {
+         // Bottone "Reset Trailing Stop" - resetta solo trailing stop
+         Print("Bottone Reset Trailing Stop premuto - Reset livello trailing stop...");
+         ResetTrailingStop();
+
+         // Reset del bottone
+         ObjectSetInteger(0, buttonResetTSName, OBJPROP_STATE, false);
+         ChartRedraw();
+      }
    }
 }
 
@@ -455,6 +468,31 @@ void CreateResetButton()
 }
 
 //+------------------------------------------------------------------+
+//| Funzione per creare il bottone Reset Trailing Stop               |
+//+------------------------------------------------------------------+
+void CreateResetTSButton()
+{
+   // Elimina il bottone se esiste già
+   ObjectDelete(0, buttonResetTSName);
+
+   // Crea il bottone
+   ObjectCreate(0, buttonResetTSName, OBJ_BUTTON, 0, 0, 0);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_XDISTANCE, BUTTON_X);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_YDISTANCE, BUTTON_Y + (BUTTON_HEIGHT * 3) + 15);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_XSIZE, BUTTON_WIDTH);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_YSIZE, BUTTON_HEIGHT);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_BGCOLOR, clrMediumPurple);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_COLOR, TEXT_COLOR);
+   ObjectSetString(0, buttonResetTSName, OBJPROP_TEXT, "Reset Trailing");
+   ObjectSetString(0, buttonResetTSName, OBJPROP_FONT, "Arial Bold");
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_FONTSIZE, 9);
+   ObjectSetInteger(0, buttonResetTSName, OBJPROP_SELECTABLE, false);
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
 //| Funzione per creare la label del timer                           |
 //+------------------------------------------------------------------+
 void CreateTimerLabel()
@@ -465,7 +503,7 @@ void CreateTimerLabel()
    // Crea la label - allineata al lato destro del bottone
    ObjectCreate(0, timerLabel, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(0, timerLabel, OBJPROP_XDISTANCE, BUTTON_X - 150);
-   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + (BUTTON_HEIGHT * 3) + 20); // Sotto i tre bottoni
+   ObjectSetInteger(0, timerLabel, OBJPROP_YDISTANCE, BUTTON_Y + (BUTTON_HEIGHT * 4) + 25); // Sotto i quattro bottoni
    ObjectSetInteger(0, timerLabel, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
    ObjectSetInteger(0, timerLabel, OBJPROP_COLOR, clrYellow);
@@ -499,7 +537,7 @@ void UpdateSessionTimer()
 //+------------------------------------------------------------------+
 void CreateInfoLabels()
 {
-   int yPos = BUTTON_Y + (BUTTON_HEIGHT * 3) + 45; // Posizione iniziale sotto il timer
+   int yPos = BUTTON_Y + (BUTTON_HEIGHT * 4) + 50; // Posizione iniziale sotto il timer
    int lineHeight = 15; // Spaziatura tra le righe
    int labelX = BUTTON_X - 150; // Offset per allineamento perfetto
 
@@ -779,6 +817,39 @@ void ResetSessionStats()
          "Max DD: 0.00\n" +
          "Profit/Loss: 0.00\n\n" +
          "Nuova sessione iniziata!");
+
+   ChartRedraw();
+}
+
+//+------------------------------------------------------------------+
+//| Funzione per resettare solo il trailing stop                     |
+//+------------------------------------------------------------------+
+void ResetTrailingStop()
+{
+   Print("========================================");
+   Print("RESET TRAILING STOP");
+   Print("========================================");
+
+   // Resetta solo il livello di trailing stop
+   trailingStopLevel = 0;
+
+   // Salva il nuovo valore
+   SaveSessionData();
+
+   Print("Livello trailing stop resettato a 0");
+   Print("Tutte le altre statistiche rimangono invariate");
+   Print("========================================");
+
+   // Aggiorna il pannello per mostrare "Trailing Stop: None"
+   double currentEquity = AccountEquity();
+   double sessionPL = currentEquity - sessionStartEquity;
+   double sessionPLPercent = (sessionStartEquity > 0) ? (sessionPL / sessionStartEquity * 100.0) : 0;
+   UpdateInfoPanel(currentEquity, sessionPL, sessionPLPercent);
+
+   Alert("Trailing Stop Resettato!\n\n" +
+         "Livello trailing stop: None\n\n" +
+         "Tutte le altre statistiche\n" +
+         "rimangono invariate");
 
    ChartRedraw();
 }

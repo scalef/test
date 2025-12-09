@@ -9,8 +9,10 @@
 #property strict
 
 // Parametri input - Risk Management
-input double DailyTakeProfit = 500;  // Daily Take Profit (0 = disabled)
-input double DailyStopLoss = 500;    // Daily Stop Loss (0 = disabled)
+input double DailyTakeProfit = 500;  // Daily Take Profit in $ (0 = disabled)
+input double DailyStopLoss = 500;    // Daily Stop Loss in $ (0 = disabled)
+input double DailyTakeProfitPercent = 0;  // Daily Take Profit in % (0 = disabled)
+input double DailyStopLossPercent = 0;    // Daily Stop Loss in % (0 = disabled)
 
 // Parametri input - Trailing Stop Levels
 input double TP1 = 100;   // TP1 - Primo livello breakeven (0 = disabled)
@@ -216,13 +218,15 @@ void OnTick()
    // Controlla i livelli di trailing stop
    CheckTrailingStop(sessionPL);
 
-   // Verifica Take Profit giornaliero
-   if(DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit)
+   // Verifica Take Profit giornaliero ($ o %)
+   if((DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit) ||
+      (DailyTakeProfitPercent > 0 && sessionPLPercent >= DailyTakeProfitPercent))
    {
       Print("========================================");
       Print("TAKE PROFIT GIORNALIERO RAGGIUNTO!");
       Print("Profitto: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
-      Print("Target TP: ", DoubleToString(DailyTakeProfit, 2));
+      if(DailyTakeProfit > 0) Print("Target TP $: ", DoubleToString(DailyTakeProfit, 2));
+      if(DailyTakeProfitPercent > 0) Print("Target TP %: ", DoubleToString(DailyTakeProfitPercent, 2), "%");
       Print("Chiusura automatica in corso...");
       Print("========================================");
 
@@ -236,13 +240,15 @@ void OnTick()
       return;
    }
 
-   // Verifica Stop Loss giornaliero
-   if(DailyStopLoss > 0 && sessionPL <= -DailyStopLoss)
+   // Verifica Stop Loss giornaliero ($ o %)
+   if((DailyStopLoss > 0 && sessionPL <= -DailyStopLoss) ||
+      (DailyStopLossPercent > 0 && sessionPLPercent <= -DailyStopLossPercent))
    {
       Print("========================================");
       Print("STOP LOSS GIORNALIERO RAGGIUNTO!");
       Print("Perdita: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
-      Print("Target SL: -", DoubleToString(DailyStopLoss, 2));
+      if(DailyStopLoss > 0) Print("Target SL $: -", DoubleToString(DailyStopLoss, 2));
+      if(DailyStopLossPercent > 0) Print("Target SL %: -", DoubleToString(DailyStopLossPercent, 2), "%");
       Print("Chiusura automatica in corso...");
       Print("========================================");
 
@@ -296,13 +302,15 @@ void OnTimer()
    // Controlla i livelli di trailing stop
    CheckTrailingStop(sessionPL);
 
-   // Verifica Take Profit giornaliero
-   if(DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit)
+   // Verifica Take Profit giornaliero ($ o %)
+   if((DailyTakeProfit > 0 && sessionPL >= DailyTakeProfit) ||
+      (DailyTakeProfitPercent > 0 && sessionPLPercent >= DailyTakeProfitPercent))
    {
       Print("========================================");
       Print("TAKE PROFIT GIORNALIERO RAGGIUNTO!");
       Print("Profitto: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
-      Print("Target TP: ", DoubleToString(DailyTakeProfit, 2));
+      if(DailyTakeProfit > 0) Print("Target TP $: ", DoubleToString(DailyTakeProfit, 2));
+      if(DailyTakeProfitPercent > 0) Print("Target TP %: ", DoubleToString(DailyTakeProfitPercent, 2), "%");
       Print("Chiusura automatica in corso...");
       Print("========================================");
 
@@ -316,13 +324,15 @@ void OnTimer()
       return;
    }
 
-   // Verifica Stop Loss giornaliero
-   if(DailyStopLoss > 0 && sessionPL <= -DailyStopLoss)
+   // Verifica Stop Loss giornaliero ($ o %)
+   if((DailyStopLoss > 0 && sessionPL <= -DailyStopLoss) ||
+      (DailyStopLossPercent > 0 && sessionPLPercent <= -DailyStopLossPercent))
    {
       Print("========================================");
       Print("STOP LOSS GIORNALIERO RAGGIUNTO!");
       Print("Perdita: ", DoubleToString(sessionPL, 2), " (", DoubleToString(sessionPLPercent, 2), "%)");
-      Print("Target SL: -", DoubleToString(DailyStopLoss, 2));
+      if(DailyStopLoss > 0) Print("Target SL $: -", DoubleToString(DailyStopLoss, 2));
+      if(DailyStopLossPercent > 0) Print("Target SL %: -", DoubleToString(DailyStopLossPercent, 2), "%");
       Print("Chiusura automatica in corso...");
       Print("========================================");
 

@@ -50,6 +50,7 @@ input int RolloverEndMin = 10;                     // Rollover end minute
 // Order Settings
 input int MagicNumber = 123456;                    // Magic number
 input string OrderComment = "LiqSweep";            // Order comment
+input int SlippagePoints = 30;                     // Slippage in points
 
 //+------------------------------------------------------------------+
 //| GLOBAL VARIABLES                                                  |
@@ -79,6 +80,7 @@ datetime currentDay = 0;
 double dailyPL = 0;
 int consecutiveLosses = 0;
 bool dailyTradingBlocked = false;
+double dayStartBalance = 0;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                     |
@@ -106,6 +108,7 @@ int OnInit()
 
    // Initialize daily tracking
    currentDay = iTime(Symbol(), PERIOD_D1, 0);
+   dayStartBalance = AccountBalance();
 
    return(INIT_SUCCEEDED);
 }
@@ -248,10 +251,12 @@ void UpdateDailyLevels()
    if(today != currentDay)
    {
       currentDay = today;
+      dayStartBalance = AccountBalance();
       dailyPL = 0;
       consecutiveLosses = 0;
       dailyTradingBlocked = false;
       Print("*** NEW DAY STARTED - Daily counters reset ***");
+      Print("Day start balance: $", DoubleToString(dayStartBalance, 2));
    }
 
    // Get previous day's high and low
@@ -305,8 +310,8 @@ void UpdateAsiaLevels()
          lastAsiaReset = asiaDay;
       }
 
-      double currentHigh = iHigh(Symbol(), PERIOD_M5, 0);
-      double currentLow = iLow(Symbol(), PERIOD_M5, 0);
+      double currentHigh = iHigh(Symbol(), PERIOD_M5, 1);
+      double currentLow = iLow(Symbol(), PERIOD_M5, 1);
 
       if(AsiaHigh == 0 || currentHigh > AsiaHigh) AsiaHigh = currentHigh;
       if(AsiaLow == 0 || currentLow < AsiaLow) AsiaLow = currentLow;
@@ -376,6 +381,14 @@ void DetectSweepAndConfirm()
    if(sweepActive)
    {
       int barsElapsed = iBarShift(Symbol(), PERIOD_M5, sweepTime, false);
+
+      // Guard against invalid bar shift
+      if(barsElapsed == -1)
+      {
+         Print("Sweep invalidated: iBarShift=-1");
+         sweepActive = false;
+         return;
+      }
 
       if(barsElapsed > ConfirmBars)
       {
@@ -499,6 +512,9 @@ void DetectSweepAndConfirm()
 //+------------------------------------------------------------------+
 void OpenTrade(int orderType)
 {
+   // Refresh market data
+   RefreshRates();
+
    double entryPrice = 0;
    double slPrice = 0;
    double tpPrice = 0;
@@ -574,7 +590,7 @@ void OpenTrade(int orderType)
       orderType,          // Order type (OP_BUY or OP_SELL)
       lots,               // Lot size
       entryPrice,         // Entry price
-      3,                  // Slippage (3 points)
+      SlippagePoints,     // Slippage
       slPrice,            // Stop Loss
       tpPrice,            // Take Profit
       OrderComment,       // Comment
@@ -749,8 +765,8 @@ void UpdateDailyRiskState()
    dailyPL = todayPL;
    consecutiveLosses = tempConsecutiveLosses;
 
-   // Check daily loss limit
-   double dailyLossLimit = AccountBalance() * DailyLossLimitPercent / 100.0;
+   // Check daily loss limit (use day start balance, not current balance)
+   double dailyLossLimit = dayStartBalance * DailyLossLimitPercent / 100.0;
 
    if(dailyPL < -dailyLossLimit && !dailyTradingBlocked)
    {
@@ -758,7 +774,7 @@ void UpdateDailyRiskState()
       Print("========================================");
       Print("DAILY LOSS LIMIT REACHED");
       Print("Daily P/L: $", DoubleToString(dailyPL, 2));
-      Print("Limit: $", DoubleToString(-dailyLossLimit, 2));
+      Print("Limit: $", DoubleToString(-dailyLossLimit, 2), " (", DailyLossLimitPercent, "% of $", DoubleToString(dayStartBalance, 2), ")");
       Print("Trading BLOCKED for remainder of day");
       Print("========================================");
    }

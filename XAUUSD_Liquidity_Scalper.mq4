@@ -433,6 +433,7 @@ void DetectSweepAndConfirm()
    // === CHECK FOR SWEEP UP (stop hunt above resistance) ===
    // Build array of resistance levels to check
    double levelsUp[10];
+   ArrayInitialize(levelsUp, 0);
    int countUp = 0;
 
    if(PDH > 0) { levelsUp[countUp] = PDH; countUp++; }
@@ -471,6 +472,7 @@ void DetectSweepAndConfirm()
    // === CHECK FOR SWEEP DOWN (stop hunt below support) ===
    // Build array of support levels to check
    double levelsDown[10];
+   ArrayInitialize(levelsDown, 0);
    int countDown = 0;
 
    if(PDL > 0) { levelsDown[countDown] = PDL; countDown++; }

@@ -64,6 +64,11 @@ input double DailyStopNewTradesAt = 0.70;          // Stop new trades at 70% of 
 input double DailyCloseAllAt = 0.85;               // Close all at 85% of daily limit
 input double MaxLossStopBuffer = 500.0;            // Buffer above max loss floor
 
+// Daily Profit Target and Trade Limits
+input bool UseDailyProfitTarget = true;            // Use daily profit target
+input double DailyProfitTarget = 1600.0;           // Daily profit target ($)
+input int MaxTradesPerDay = 2;                     // Max trades per day
+
 //+------------------------------------------------------------------+
 //| GLOBAL VARIABLES                                                  |
 //+------------------------------------------------------------------+
@@ -102,6 +107,11 @@ double peakEquityToday = 0;
 bool blockedToday = false;
 bool permanentlyBlocked = false;
 datetime lastPropFirmCheckDay = 0;
+
+// Daily Profit Target and Trade Limits
+double dayStartEquity = 0;
+int tradesOpenedToday = 0;
+bool dailyProfitTargetReached = false;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                     |
@@ -144,8 +154,11 @@ int OnInit()
    TimeTradeServer(dt);
    lastPropFirmCheckDay = StringToTime(StringFormat("%04d.%02d.%02d 00:00", dt.year, dt.mon, dt.day));
    peakEquityToday = AccountInfoDouble(ACCOUNT_EQUITY);
+   dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
    blockedToday = false;
    permanentlyBlocked = false;
+   tradesOpenedToday = 0;
+   dailyProfitTargetReached = false;
 
    Print("Prop Firm Protection initialized:");
    Print("  Initial Balance: $", DoubleToString(InitialBalance, 2));
@@ -153,6 +166,8 @@ int OnInit()
    Print("  Max Loss Limit: ", DoubleToString(MaxLossPct * 100, 2), "% ($", DoubleToString(InitialBalance * MaxLossPct, 2), ")");
    Print("  Floor Equity: $", DoubleToString(InitialBalance * (1.0 - MaxLossPct), 2));
    Print("  Current Equity: $", DoubleToString(peakEquityToday, 2));
+   Print("  Daily Profit Target: ", UseDailyProfitTarget ? ("$" + DoubleToString(DailyProfitTarget, 2)) : "Disabled");
+   Print("  Max Trades Per Day: ", MaxTradesPerDay);
 
    return(INIT_SUCCEEDED);
 }
@@ -181,6 +196,12 @@ void OnTick()
    if(!CheckPropFirmProtection())
    {
       return; // Blocked by prop firm protection
+   }
+
+   // Check daily profit target and trade limits
+   if(!CheckDailyLimits())
+   {
+      return; // Blocked by daily limits
    }
 
    // Increment sweep counter if active
@@ -719,6 +740,9 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
       string direction = (orderType == ORDER_TYPE_BUY) ? "BUY" : "SELL";
       double riskMoney = AccountInfoDouble(ACCOUNT_BALANCE) * RiskPercent / 100.0;
 
+      // Increment daily trade counter
+      tradesOpenedToday++;
+
       Print("========================================");
       Print("TRADE OPENED SUCCESSFULLY");
       Print("Ticket: ", trade.ResultOrder());
@@ -729,6 +753,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
       Print("Lot Size: ", DoubleToString(lots, 2));
       Print("Risk: $", DoubleToString(riskMoney, 2), " (", RiskPercent, "%)");
       Print("Risk/Reward: 1:", RR);
+      Print("Trades Opened Today: ", tradesOpenedToday, "/", MaxTradesPerDay);
       Print("========================================");
    }
    else
@@ -936,12 +961,17 @@ bool CheckPropFirmProtection()
    {
       lastPropFirmCheckDay = currentServerDay;
       peakEquityToday = AccountInfoDouble(ACCOUNT_EQUITY);
+      dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
       blockedToday = false;
+      tradesOpenedToday = 0;
+      dailyProfitTargetReached = false;
 
       Print("========================================");
       Print("PROP FIRM: NEW DAY RESET");
       Print("Peak Equity Today: $", DoubleToString(peakEquityToday, 2));
+      Print("Day Start Equity: $", DoubleToString(dayStartEquity, 2));
       Print("Blocked Today: ", blockedToday);
+      Print("Trades Opened Today: ", tradesOpenedToday);
       Print("========================================");
    }
 
@@ -1069,5 +1099,60 @@ void CloseAllPositions(string reason)
    {
       Print("Total positions closed: ", closed, " | Reason: ", reason);
    }
+}
+
+//+------------------------------------------------------------------+
+//| Check Daily Profit Target and Trade Limits                       |
+//+------------------------------------------------------------------+
+bool CheckDailyLimits()
+{
+   // Check if daily profit target already reached
+   if(dailyProfitTargetReached)
+   {
+      return false;
+   }
+
+   // Get current equity
+   double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+
+   // Calculate today's profit
+   double profitToday = currentEquity - dayStartEquity;
+
+   // Check daily profit target
+   if(UseDailyProfitTarget && profitToday >= DailyProfitTarget)
+   {
+      Print("========================================");
+      Print("DAILY PROFIT TARGET REACHED");
+      Print("Target: $", DoubleToString(DailyProfitTarget, 2));
+      Print("Profit Today: $", DoubleToString(profitToday, 2));
+      Print("Day Start Equity: $", DoubleToString(dayStartEquity, 2));
+      Print("Current Equity: $", DoubleToString(currentEquity, 2));
+      Print("CLOSING ALL POSITIONS AND BLOCKING FOR TODAY");
+      Print("========================================");
+
+      CloseAllPositions("Daily Profit Target Reached");
+      dailyProfitTargetReached = true;
+      return false;
+   }
+
+   // Check max trades per day
+   if(tradesOpenedToday >= MaxTradesPerDay)
+   {
+      // Silent block - only log once when first blocked
+      static bool maxTradesLoggedToday = false;
+      if(!maxTradesLoggedToday)
+      {
+         Print("========================================");
+         Print("MAX TRADES PER DAY REACHED");
+         Print("Trades Today: ", tradesOpenedToday, "/", MaxTradesPerDay);
+         Print("No new trades until tomorrow");
+         Print("========================================");
+         maxTradesLoggedToday = true;
+      }
+      return false;
+   }
+
+   // All checks passed
+   return true;
 }
 //+------------------------------------------------------------------+

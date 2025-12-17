@@ -80,7 +80,7 @@ int sweepDirection = 0;                            // 1 = sweep up (SELL), -1 = 
 double sweepLevel = 0;
 double sweepHigh = 0;
 double sweepLow = 0;
-datetime sweepTime = 0;
+int sweepBarsElapsed = 0;
 
 // Daily risk management
 datetime currentDay = 0;
@@ -147,6 +147,12 @@ void OnTick()
 {
    // Execute logic only on new bar (M5)
    if(!IsNewBar()) return;
+
+   // Increment sweep counter if active
+   if(sweepActive)
+   {
+      sweepBarsElapsed++;
+   }
 
    // Update daily risk state and check for new day
    UpdateDailyRiskState();
@@ -411,45 +417,60 @@ void DetectSweepAndConfirm()
    // If we have an active sweep, check for confirmation
    if(sweepActive)
    {
-      int barsElapsed = Bars(_Symbol, PERIOD_M5, sweepTime, TimeCurrent());
-
-      // Guard against invalid bar count
-      if(barsElapsed <= 0)
+      // Check timeout
+      if(sweepBarsElapsed > ConfirmBars)
       {
-         Print("Sweep invalidated: invalid bar count");
+         Print("Sweep confirmation TIMEOUT (", sweepBarsElapsed, " bars elapsed)");
          sweepActive = false;
          return;
       }
 
-      if(barsElapsed > ConfirmBars)
-      {
-         // Timeout - invalidate sweep
-         Print("Sweep confirmation TIMEOUT (", barsElapsed, " bars elapsed)");
-         sweepActive = false;
-         return;
-      }
-
-      // Check for confirmation on last closed bar
-      double closeArray[];
+      // Get current bar data for confirmation check
+      double highArray[], lowArray[], closeArray[];
+      CopyHigh(_Symbol, PERIOD_M5, 1, 1, highArray);
+      CopyLow(_Symbol, PERIOD_M5, 1, 1, lowArray);
       CopyClose(_Symbol, PERIOD_M5, 1, 1, closeArray);
+
+      double high1 = highArray[0];
+      double low1 = lowArray[0];
       double close1 = closeArray[0];
 
       if(sweepDirection == 1) // Sweep UP -> looking for SELL confirmation
       {
-         if(close1 < sweepLow)
+         Print("DEBUG Sweep: Bar ", sweepBarsElapsed, "/", ConfirmBars,
+               " | Low[1]=", DoubleToString(low1, _Digits),
+               " | Close[1]=", DoubleToString(close1, _Digits),
+               " | Need: Low < ", DoubleToString(sweepLow, _Digits),
+               " AND Close < ", DoubleToString(sweepLevel, _Digits));
+
+         // Confirmation: price broke below sweep low AND closed below level
+         if(low1 < sweepLow && close1 < sweepLevel)
          {
+            Print("========================================");
             Print(">>> SELL CONFIRMATION DETECTED <<<");
-            Print("Close[1]: ", DoubleToString(close1, _Digits), " < SweepLow: ", DoubleToString(sweepLow, _Digits));
+            Print("Low[1]: ", DoubleToString(low1, _Digits), " < SweepLow: ", DoubleToString(sweepLow, _Digits));
+            Print("Close[1]: ", DoubleToString(close1, _Digits), " < SweepLevel: ", DoubleToString(sweepLevel, _Digits));
+            Print("========================================");
             OpenTrade(ORDER_TYPE_SELL);
             sweepActive = false;
          }
       }
       else if(sweepDirection == -1) // Sweep DOWN -> looking for BUY confirmation
       {
-         if(close1 > sweepHigh)
+         Print("DEBUG Sweep: Bar ", sweepBarsElapsed, "/", ConfirmBars,
+               " | High[1]=", DoubleToString(high1, _Digits),
+               " | Close[1]=", DoubleToString(close1, _Digits),
+               " | Need: High > ", DoubleToString(sweepHigh, _Digits),
+               " AND Close > ", DoubleToString(sweepLevel, _Digits));
+
+         // Confirmation: price broke above sweep high AND closed above level
+         if(high1 > sweepHigh && close1 > sweepLevel)
          {
+            Print("========================================");
             Print(">>> BUY CONFIRMATION DETECTED <<<");
-            Print("Close[1]: ", DoubleToString(close1, _Digits), " > SweepHigh: ", DoubleToString(sweepHigh, _Digits));
+            Print("High[1]: ", DoubleToString(high1, _Digits), " > SweepHigh: ", DoubleToString(sweepHigh, _Digits));
+            Print("Close[1]: ", DoubleToString(close1, _Digits), " > SweepLevel: ", DoubleToString(sweepLevel, _Digits));
+            Print("========================================");
             OpenTrade(ORDER_TYPE_BUY);
             sweepActive = false;
          }
@@ -492,7 +513,7 @@ void DetectSweepAndConfirm()
          sweepLevel = L;
          sweepHigh = high1;
          sweepLow = low1;
-         sweepTime = timeArray[0];
+         sweepBarsElapsed = 0; // Reset counter
 
          // Identify which level was swept
          string levelName = "Unknown";
@@ -500,10 +521,13 @@ void DetectSweepAndConfirm()
          else if(MathAbs(L - AsiaHigh) < 0.01) levelName = "AsiaHigh";
          else if(MathAbs(L - EQH_Level) < 0.01) levelName = "EQH";
 
+         Print("========================================");
          Print("*** SWEEP UP DETECTED ***");
          Print("Level: ", levelName, " at ", DoubleToString(L, _Digits));
-         Print("High: ", DoubleToString(high1, _Digits), " | Close: ", DoubleToString(close1, _Digits));
-         Print("Waiting for SELL confirmation...");
+         Print("Sweep bar - High[1]: ", DoubleToString(high1, _Digits), " | Low[1]: ", DoubleToString(low1, _Digits), " | Close[1]: ", DoubleToString(close1, _Digits));
+         Print("Saved - SweepLevel: ", DoubleToString(sweepLevel, _Digits), " | SweepHigh: ", DoubleToString(sweepHigh, _Digits), " | SweepLow: ", DoubleToString(sweepLow, _Digits));
+         Print("Waiting for SELL confirmation (max ", ConfirmBars, " bars)...");
+         Print("========================================");
 
          return; // One sweep at a time
       }
@@ -531,7 +555,7 @@ void DetectSweepAndConfirm()
          sweepLevel = L;
          sweepHigh = high1;
          sweepLow = low1;
-         sweepTime = timeArray[0];
+         sweepBarsElapsed = 0; // Reset counter
 
          // Identify which level was swept
          string levelName = "Unknown";
@@ -539,10 +563,13 @@ void DetectSweepAndConfirm()
          else if(MathAbs(L - AsiaLow) < 0.01) levelName = "AsiaLow";
          else if(MathAbs(L - EQL_Level) < 0.01) levelName = "EQL";
 
+         Print("========================================");
          Print("*** SWEEP DOWN DETECTED ***");
          Print("Level: ", levelName, " at ", DoubleToString(L, _Digits));
-         Print("Low: ", DoubleToString(low1, _Digits), " | Close: ", DoubleToString(close1, _Digits));
-         Print("Waiting for BUY confirmation...");
+         Print("Sweep bar - High[1]: ", DoubleToString(high1, _Digits), " | Low[1]: ", DoubleToString(low1, _Digits), " | Close[1]: ", DoubleToString(close1, _Digits));
+         Print("Saved - SweepLevel: ", DoubleToString(sweepLevel, _Digits), " | SweepHigh: ", DoubleToString(sweepHigh, _Digits), " | SweepLow: ", DoubleToString(sweepLow, _Digits));
+         Print("Waiting for BUY confirmation (max ", ConfirmBars, " bars)...");
+         Print("========================================");
 
          return; // One sweep at a time
       }

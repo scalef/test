@@ -68,6 +68,7 @@ input double MaxLossStopBuffer = 500.0;            // Buffer above max loss floo
 input bool UseDailyProfitTarget = true;            // Use daily profit target
 input double DailyProfitTarget = 1600.0;           // Daily profit target ($)
 input int MaxTradesPerDay = 2;                     // Max trades per day
+input double MaxSLDistance = 2.0;                  // Max SL distance (dollars)
 
 //+------------------------------------------------------------------+
 //| GLOBAL VARIABLES                                                  |
@@ -494,18 +495,18 @@ void DetectSweepAndConfirm()
       if(sweepDirection == 1) // Sweep UP -> looking for SELL confirmation
       {
          Print("DEBUG Sweep: Bar ", sweepBarsElapsed, "/", ConfirmBars,
-               " | Low[1]=", DoubleToString(low1, _Digits),
+               " | High[1]=", DoubleToString(high1, _Digits),
                " | Close[1]=", DoubleToString(close1, _Digits),
-               " | Need: Low < ", DoubleToString(sweepLow, _Digits),
-               " AND Close < ", DoubleToString(sweepLevel, _Digits));
+               " | Need: Close < ", DoubleToString(sweepLevel, _Digits),
+               " AND High < ", DoubleToString(sweepHigh, _Digits));
 
-         // Confirmation: price broke below sweep low AND closed below level
-         if(low1 < sweepLow && close1 < sweepLevel)
+         // Confirmation: closed below level AND high below sweep high (rejection confirmed)
+         if(close1 < sweepLevel && high1 < sweepHigh)
          {
             Print("========================================");
             Print(">>> SELL CONFIRMATION DETECTED <<<");
-            Print("Low[1]: ", DoubleToString(low1, _Digits), " < SweepLow: ", DoubleToString(sweepLow, _Digits));
             Print("Close[1]: ", DoubleToString(close1, _Digits), " < SweepLevel: ", DoubleToString(sweepLevel, _Digits));
+            Print("High[1]: ", DoubleToString(high1, _Digits), " < SweepHigh: ", DoubleToString(sweepHigh, _Digits));
             Print("========================================");
             OpenTrade(ORDER_TYPE_SELL);
             sweepActive = false;
@@ -514,18 +515,18 @@ void DetectSweepAndConfirm()
       else if(sweepDirection == -1) // Sweep DOWN -> looking for BUY confirmation
       {
          Print("DEBUG Sweep: Bar ", sweepBarsElapsed, "/", ConfirmBars,
-               " | High[1]=", DoubleToString(high1, _Digits),
+               " | Low[1]=", DoubleToString(low1, _Digits),
                " | Close[1]=", DoubleToString(close1, _Digits),
-               " | Need: High > ", DoubleToString(sweepHigh, _Digits),
-               " AND Close > ", DoubleToString(sweepLevel, _Digits));
+               " | Need: Close > ", DoubleToString(sweepLevel, _Digits),
+               " AND Low > ", DoubleToString(sweepLow, _Digits));
 
-         // Confirmation: price broke above sweep high AND closed above level
-         if(high1 > sweepHigh && close1 > sweepLevel)
+         // Confirmation: closed above level AND low above sweep low (rejection confirmed)
+         if(close1 > sweepLevel && low1 > sweepLow)
          {
             Print("========================================");
             Print(">>> BUY CONFIRMATION DETECTED <<<");
-            Print("High[1]: ", DoubleToString(high1, _Digits), " > SweepHigh: ", DoubleToString(sweepHigh, _Digits));
             Print("Close[1]: ", DoubleToString(close1, _Digits), " > SweepLevel: ", DoubleToString(sweepLevel, _Digits));
+            Print("Low[1]: ", DoubleToString(low1, _Digits), " > SweepLow: ", DoubleToString(sweepLow, _Digits));
             Print("========================================");
             OpenTrade(ORDER_TYPE_BUY);
             sweepActive = false;
@@ -694,10 +695,17 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
       return;
    }
 
+   // Check max SL distance
+   double slDistance = MathAbs(entryPrice - slPrice);
+   if(slDistance > MaxSLDistance)
+   {
+      Print("Skipped: SL distance too large (", DoubleToString(slDistance, 2), " > ", DoubleToString(MaxSLDistance, 2), ")");
+      return;
+   }
+
    // Validate minimum stop level
    long stopLevel = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
    double minStopLevel = stopLevel * _Point;
-   double slDistance = MathAbs(entryPrice - slPrice);
    double tpDistance = MathAbs(tpPrice - entryPrice);
 
    if(slDistance < minStopLevel)

@@ -56,6 +56,14 @@ input int SlippagePoints = 30;                     // Slippage in points
 input bool AllowBuy = true;                        // Allow BUY orders
 input bool AllowSell = true;                       // Allow SELL orders
 
+// Prop Firm Protection
+input double InitialBalance = 100000.0;            // Initial balance for prop firm
+input double DailyLossPct = 0.05;                  // Daily loss limit (5%)
+input double MaxLossPct = 0.10;                    // Max total loss (10% for 2-step, 0.06 for 1-step)
+input double DailyStopNewTradesAt = 0.80;          // Stop new trades at 80% of daily limit
+input double DailyCloseAllAt = 0.90;               // Close all at 90% of daily limit
+input double MaxLossStopBuffer = 200.0;            // Buffer above max loss floor
+
 //+------------------------------------------------------------------+
 //| GLOBAL VARIABLES                                                  |
 //+------------------------------------------------------------------+
@@ -88,6 +96,12 @@ double dailyPL = 0;
 int consecutiveLosses = 0;
 bool dailyTradingBlocked = false;
 double dayStartBalance = 0;
+
+// Prop Firm Protection
+double peakEquityToday = 0;
+bool blockedToday = false;
+bool permanentlyBlocked = false;
+datetime lastPropFirmCheckDay = 0;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                     |
@@ -125,6 +139,21 @@ int OnInit()
    currentDay = timeArray[0];
    dayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
 
+   // Initialize prop firm protection
+   MqlDateTime dt;
+   TimeTradeServer(dt);
+   lastPropFirmCheckDay = StringToTime(StringFormat("%04d.%02d.%02d 00:00", dt.year, dt.mon, dt.day));
+   peakEquityToday = AccountInfoDouble(ACCOUNT_EQUITY);
+   blockedToday = false;
+   permanentlyBlocked = false;
+
+   Print("Prop Firm Protection initialized:");
+   Print("  Initial Balance: $", DoubleToString(InitialBalance, 2));
+   Print("  Daily Loss Limit: ", DoubleToString(DailyLossPct * 100, 2), "% ($", DoubleToString(InitialBalance * DailyLossPct, 2), ")");
+   Print("  Max Loss Limit: ", DoubleToString(MaxLossPct * 100, 2), "% ($", DoubleToString(InitialBalance * MaxLossPct, 2), ")");
+   Print("  Floor Equity: $", DoubleToString(InitialBalance * (1.0 - MaxLossPct), 2));
+   Print("  Current Equity: $", DoubleToString(peakEquityToday, 2));
+
    return(INIT_SUCCEEDED);
 }
 
@@ -147,6 +176,12 @@ void OnTick()
 {
    // Execute logic only on new bar (M5)
    if(!IsNewBar()) return;
+
+   // Check prop firm protection FIRST (every tick/bar)
+   if(!CheckPropFirmProtection())
+   {
+      return; // Blocked by prop firm protection
+   }
 
    // Increment sweep counter if active
    if(sweepActive)
@@ -877,6 +912,162 @@ void UpdateDailyRiskState()
       Print("Limit: ", MaxConsecutiveLosses);
       Print("Trading BLOCKED for remainder of day");
       Print("========================================");
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Prop Firm Protection Check                                        |
+//+------------------------------------------------------------------+
+bool CheckPropFirmProtection()
+{
+   // Check if permanently blocked
+   if(permanentlyBlocked)
+   {
+      return false;
+   }
+
+   // Get current server time
+   MqlDateTime dt;
+   TimeTradeServer(dt);
+   datetime currentServerDay = StringToTime(StringFormat("%04d.%02d.%02d 00:00", dt.year, dt.mon, dt.day));
+
+   // Check if new day started (server time)
+   if(currentServerDay != lastPropFirmCheckDay)
+   {
+      lastPropFirmCheckDay = currentServerDay;
+      peakEquityToday = AccountInfoDouble(ACCOUNT_EQUITY);
+      blockedToday = false;
+
+      Print("========================================");
+      Print("PROP FIRM: NEW DAY RESET");
+      Print("Peak Equity Today: $", DoubleToString(peakEquityToday, 2));
+      Print("Blocked Today: ", blockedToday);
+      Print("========================================");
+   }
+
+   // Get current equity
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+
+   // Update peak equity
+   if(equity > peakEquityToday)
+   {
+      peakEquityToday = equity;
+   }
+
+   // Calculate limits
+   double dailyLimit = InitialBalance * DailyLossPct;
+   double dailyDD = peakEquityToday - equity;
+   double floorEquity = InitialBalance * (1.0 - MaxLossPct);
+
+   // Rule 1: Check if equity breached floor (CRITICAL - close all and block permanently)
+   if(equity <= floorEquity)
+   {
+      Print("========================================");
+      Print("CRITICAL: MAX LOSS BREACH PROTECTION TRIGGERED");
+      Print("Current Equity: $", DoubleToString(equity, 2));
+      Print("Floor Equity: $", DoubleToString(floorEquity, 2));
+      Print("Max Loss: ", DoubleToString(MaxLossPct * 100, 2), "%");
+      Print("CLOSING ALL POSITIONS AND BLOCKING PERMANENTLY");
+      Print("========================================");
+
+      CloseAllPositions("Max Loss Breach");
+      permanentlyBlocked = true;
+      return false;
+   }
+
+   // Rule 2: Check if equity near floor (stop new trades)
+   if(equity <= floorEquity + MaxLossStopBuffer)
+   {
+      if(!blockedToday)
+      {
+         Print("========================================");
+         Print("PROP FIRM: APPROACHING MAX LOSS LIMIT");
+         Print("Current Equity: $", DoubleToString(equity, 2));
+         Print("Floor + Buffer: $", DoubleToString(floorEquity + MaxLossStopBuffer, 2));
+         Print("BLOCKING NEW TRADES");
+         Print("========================================");
+         blockedToday = true;
+      }
+      return false;
+   }
+
+   // Rule 3: Check daily drawdown close all threshold
+   if(dailyDD >= dailyLimit * DailyCloseAllAt)
+   {
+      Print("========================================");
+      Print("PROP FIRM: DAILY CLOSE ALL THRESHOLD REACHED");
+      Print("Daily DD: $", DoubleToString(dailyDD, 2), " (", DoubleToString((dailyDD/dailyLimit)*100, 2), "% of limit)");
+      Print("Threshold: ", DoubleToString(DailyCloseAllAt * 100, 2), "% of daily limit");
+      Print("Peak Equity Today: $", DoubleToString(peakEquityToday, 2));
+      Print("Current Equity: $", DoubleToString(equity, 2));
+      Print("CLOSING ALL POSITIONS AND BLOCKING FOR TODAY");
+      Print("========================================");
+
+      CloseAllPositions("Daily Close All Threshold");
+      blockedToday = true;
+      return false;
+   }
+
+   // Rule 4: Check daily drawdown stop new trades threshold
+   if(dailyDD >= dailyLimit * DailyStopNewTradesAt)
+   {
+      if(!blockedToday)
+      {
+         Print("========================================");
+         Print("PROP FIRM: DAILY STOP NEW TRADES THRESHOLD REACHED");
+         Print("Daily DD: $", DoubleToString(dailyDD, 2), " (", DoubleToString((dailyDD/dailyLimit)*100, 2), "% of limit)");
+         Print("Threshold: ", DoubleToString(DailyStopNewTradesAt * 100, 2), "% of daily limit");
+         Print("Peak Equity Today: $", DoubleToString(peakEquityToday, 2));
+         Print("Current Equity: $", DoubleToString(equity, 2));
+         Print("BLOCKING NEW TRADES (existing positions remain open)");
+         Print("========================================");
+         blockedToday = true;
+      }
+      return false;
+   }
+
+   // Check if blocked today for any other reason
+   if(blockedToday)
+   {
+      return false;
+   }
+
+   // All checks passed
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| Close All Positions                                               |
+//+------------------------------------------------------------------+
+void CloseAllPositions(string reason)
+{
+   int closed = 0;
+   int total = PositionsTotal();
+
+   for(int i = total - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket > 0)
+      {
+         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
+            PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+         {
+            if(trade.PositionClose(ticket))
+            {
+               closed++;
+               Print("Position closed: Ticket=", ticket, " | Reason: ", reason);
+            }
+            else
+            {
+               Print("ERROR: Failed to close position ", ticket, " | Error: ", trade.ResultRetcode());
+            }
+         }
+      }
+   }
+
+   if(closed > 0)
+   {
+      Print("Total positions closed: ", closed, " | Reason: ", reason);
    }
 }
 //+------------------------------------------------------------------+

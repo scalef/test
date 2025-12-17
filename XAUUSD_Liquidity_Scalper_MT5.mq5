@@ -70,6 +70,18 @@ input double DailyProfitTarget = 1600.0;           // Daily profit target ($)
 input int MaxTradesPerDay = 2;                     // Max trades per day
 input double MaxSLDistance = 2.0;                  // Max SL distance (dollars)
 
+// HTF Trend Filter
+input bool UseTrendFilter = true;                  // Use H1 trend filter
+input int FastEMA = 50;                            // Fast EMA period
+input int SlowEMA = 200;                           // Slow EMA period
+
+// ATR-Based Buffers
+input bool UseATRBuffers = true;                   // Use ATR-based buffers
+input int ATRPeriod = 14;                          // ATR period
+input double K_sweep = 0.35;                       // ATR multiplier for sweep buffer
+input double K_sl = 0.25;                          // ATR multiplier for SL buffer
+input double K_maxsl = 1.20;                       // ATR multiplier for max SL distance
+
 //+------------------------------------------------------------------+
 //| GLOBAL VARIABLES                                                  |
 //+------------------------------------------------------------------+
@@ -113,6 +125,11 @@ datetime lastPropFirmCheckDay = 0;
 double dayStartEquity = 0;
 int tradesOpenedToday = 0;
 bool dailyProfitTargetReached = false;
+
+// Dynamic buffers (ATR-based or fixed)
+double dynamicSweepBuffer = 0;
+double dynamicSL_Buffer = 0;
+double dynamicMaxSLDistance = 0;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                     |
@@ -192,6 +209,9 @@ void OnTick()
 {
    // Execute logic only on new bar (M5)
    if(!IsNewBar()) return;
+
+   // Update dynamic buffers (ATR-based or fixed)
+   UpdateDynamicBuffers();
 
    // Check prop firm protection FIRST (every tick/bar)
    if(!CheckPropFirmProtection())
@@ -563,7 +583,7 @@ void DetectSweepAndConfirm()
       double L = levelsUp[i];
 
       // Sweep condition: High >= L + buffer AND Close < L (rejection)
-      if(high1 >= L + SweepBuffer && close1 < L)
+      if(high1 >= L + dynamicSweepBuffer && close1 < L)
       {
          sweepActive = true;
          sweepDirection = 1; // SELL setup
@@ -605,7 +625,7 @@ void DetectSweepAndConfirm()
       double L = levelsDown[i];
 
       // Sweep condition: Low <= L - buffer AND Close > L (rejection)
-      if(low1 <= L - SweepBuffer && close1 > L)
+      if(low1 <= L - dynamicSweepBuffer && close1 > L)
       {
          sweepActive = true;
          sweepDirection = -1; // BUY setup
@@ -651,6 +671,12 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
       return;
    }
 
+   // Check HTF trend filter
+   if(!CheckTrendFilter(orderType))
+   {
+      return; // Blocked by trend filter
+   }
+
    double entryPrice = 0;
    double slPrice = 0;
    double tpPrice = 0;
@@ -664,7 +690,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    if(orderType == ORDER_TYPE_SELL)
    {
       entryPrice = bid;
-      slPrice = sweepHigh + SL_Buffer;
+      slPrice = sweepHigh + dynamicSL_Buffer;
       risk = slPrice - entryPrice;
 
       if(risk <= 0)
@@ -678,7 +704,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    else if(orderType == ORDER_TYPE_BUY)
    {
       entryPrice = ask;
-      slPrice = sweepLow - SL_Buffer;
+      slPrice = sweepLow - dynamicSL_Buffer;
       risk = entryPrice - slPrice;
 
       if(risk <= 0)
@@ -697,9 +723,9 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
 
    // Check max SL distance
    double slDistance = MathAbs(entryPrice - slPrice);
-   if(slDistance > MaxSLDistance)
+   if(slDistance > dynamicMaxSLDistance)
    {
-      Print("Skipped: SL distance too large (", DoubleToString(slDistance, 2), " > ", DoubleToString(MaxSLDistance, 2), ")");
+      Print("Skipped: SL distance too large (", DoubleToString(slDistance, 2), " > ", DoubleToString(dynamicMaxSLDistance, 2), ")");
       return;
    }
 
@@ -721,7 +747,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    }
 
    // Calculate lot size based on risk
-   double lots = CalculateLotSize(entryPrice, slPrice);
+   double lots = CalculateLotSize(entryPrice, slPrice, orderType);
    if(lots <= 0)
    {
       Print("Invalid lot size calculated: ", lots, ". Trade aborted.");
@@ -777,9 +803,9 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
 }
 
 //+------------------------------------------------------------------+
-//| Calculate lot size based on risk percentage                        |
+//| Calculate lot size based on risk percentage using OrderCalcProfit |
 //+------------------------------------------------------------------+
-double CalculateLotSize(double entryPrice, double slPrice)
+double CalculateLotSize(double entryPrice, double slPrice, ENUM_ORDER_TYPE orderType)
 {
    // Calculate SL distance in price
    double slDistance = MathAbs(entryPrice - slPrice);
@@ -790,26 +816,23 @@ double CalculateLotSize(double entryPrice, double slPrice)
    }
 
    // Get contract specifications
-   double tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
-   double tickSize = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
    double minLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
    double maxLot = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
    double lotStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
 
-   if(tickValue <= 0 || tickSize <= 0)
-   {
-      Print("ERROR: Invalid tick value (", tickValue, ") or tick size (", tickSize, ")");
-      return 0;
-   }
-
    // Calculate risk amount in account currency
    double riskMoney = AccountInfoDouble(ACCOUNT_BALANCE) * RiskPercent / 100.0;
 
-   // Calculate value per point move
-   double valuePerPoint = tickValue / tickSize;
+   // Calculate profit/loss for 1 lot using OrderCalcProfit
+   double profit1lot = 0;
+   if(!OrderCalcProfit(orderType, _Symbol, 1.0, entryPrice, slPrice, profit1lot))
+   {
+      Print("ERROR: OrderCalcProfit failed. Error: ", GetLastError());
+      return 0;
+   }
 
    // Calculate lot size
-   double lots = riskMoney / (slDistance * valuePerPoint);
+   double lots = riskMoney / MathAbs(profit1lot);
 
    // Normalize to lot step
    lots = MathFloor(lots / lotStep) * lotStep;
@@ -837,6 +860,7 @@ double CalculateLotSize(double entryPrice, double slPrice)
 
    Print("Lot calculation: Risk=$", DoubleToString(riskMoney, 2),
          " | SL dist=", DoubleToString(slDistance, _Digits),
+         " | P/L per lot=$", DoubleToString(profit1lot, 2),
          " | Lots=", DoubleToString(lots, 2));
 
    return lots;
@@ -1107,6 +1131,117 @@ void CloseAllPositions(string reason)
    {
       Print("Total positions closed: ", closed, " | Reason: ", reason);
    }
+}
+
+//+------------------------------------------------------------------+
+//| Update Dynamic Buffers (ATR-based or fixed)                      |
+//+------------------------------------------------------------------+
+void UpdateDynamicBuffers()
+{
+   if(!UseATRBuffers)
+   {
+      // Use fixed values from inputs
+      dynamicSweepBuffer = SweepBuffer;
+      dynamicSL_Buffer = SL_Buffer;
+      dynamicMaxSLDistance = MaxSLDistance;
+      return;
+   }
+
+   // Calculate ATR on M5
+   double atrArray[];
+   ArraySetAsSeries(atrArray, true);
+
+   int atrHandle = iATR(_Symbol, PERIOD_M5, ATRPeriod);
+   if(atrHandle == INVALID_HANDLE)
+   {
+      Print("ERROR: Failed to create ATR indicator handle");
+      // Fallback to fixed values
+      dynamicSweepBuffer = SweepBuffer;
+      dynamicSL_Buffer = SL_Buffer;
+      dynamicMaxSLDistance = MaxSLDistance;
+      return;
+   }
+
+   if(CopyBuffer(atrHandle, 0, 0, 1, atrArray) <= 0)
+   {
+      Print("ERROR: Failed to copy ATR buffer");
+      // Fallback to fixed values
+      dynamicSweepBuffer = SweepBuffer;
+      dynamicSL_Buffer = SL_Buffer;
+      dynamicMaxSLDistance = MaxSLDistance;
+      return;
+   }
+
+   double atr = atrArray[0];
+
+   // Calculate dynamic buffers based on ATR
+   dynamicSweepBuffer = atr * K_sweep;
+   dynamicSL_Buffer = atr * K_sl;
+   dynamicMaxSLDistance = atr * K_maxsl;
+
+   IndicatorRelease(atrHandle);
+}
+
+//+------------------------------------------------------------------+
+//| Check HTF Trend Filter (H1 EMA)                                  |
+//+------------------------------------------------------------------+
+bool CheckTrendFilter(ENUM_ORDER_TYPE orderType)
+{
+   if(!UseTrendFilter)
+   {
+      return true; // Filter disabled
+   }
+
+   // Get EMA values on H1
+   double fastEmaArray[], slowEmaArray[];
+   ArraySetAsSeries(fastEmaArray, true);
+   ArraySetAsSeries(slowEmaArray, true);
+
+   int fastHandle = iMA(_Symbol, PERIOD_H1, FastEMA, 0, MODE_EMA, PRICE_CLOSE);
+   int slowHandle = iMA(_Symbol, PERIOD_H1, SlowEMA, 0, MODE_EMA, PRICE_CLOSE);
+
+   if(fastHandle == INVALID_HANDLE || slowHandle == INVALID_HANDLE)
+   {
+      Print("ERROR: Failed to create EMA indicator handles");
+      return true; // Allow trade if indicator fails
+   }
+
+   if(CopyBuffer(fastHandle, 0, 0, 1, fastEmaArray) <= 0 ||
+      CopyBuffer(slowHandle, 0, 0, 1, slowEmaArray) <= 0)
+   {
+      Print("ERROR: Failed to copy EMA buffers");
+      IndicatorRelease(fastHandle);
+      IndicatorRelease(slowHandle);
+      return true; // Allow trade if copy fails
+   }
+
+   double fastEma = fastEmaArray[0];
+   double slowEma = slowEmaArray[0];
+
+   IndicatorRelease(fastHandle);
+   IndicatorRelease(slowHandle);
+
+   // Check trend alignment
+   if(orderType == ORDER_TYPE_BUY)
+   {
+      if(fastEma <= slowEma)
+      {
+         Print("BUY blocked by trend filter: EMA", FastEMA, "(H1)=", DoubleToString(fastEma, _Digits),
+               " <= EMA", SlowEMA, "(H1)=", DoubleToString(slowEma, _Digits));
+         return false;
+      }
+   }
+   else if(orderType == ORDER_TYPE_SELL)
+   {
+      if(fastEma >= slowEma)
+      {
+         Print("SELL blocked by trend filter: EMA", FastEMA, "(H1)=", DoubleToString(fastEma, _Digits),
+               " >= EMA", SlowEMA, "(H1)=", DoubleToString(slowEma, _Digits));
+         return false;
+      }
+   }
+
+   return true; // Trend aligned with trade direction
 }
 
 //+------------------------------------------------------------------+

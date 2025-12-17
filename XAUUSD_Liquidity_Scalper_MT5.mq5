@@ -138,6 +138,7 @@ int block_rollover = 0;
 int block_prop = 0;
 int block_dailyLimits = 0;
 int block_hasPosition = 0;
+int block_trendFilter = 0;
 int block_slTooLarge = 0;
 int block_orderFail = 0;
 
@@ -690,6 +691,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    // Check HTF trend filter
    if(!CheckTrendFilter(orderType))
    {
+      block_trendFilter++;
       return; // Blocked by trend filter
    }
 
@@ -1012,7 +1014,7 @@ bool CheckPropFirmProtection()
       // Print daily block statistics before reset
       Print("DAILY BLOCKS: time=", block_time, " spread=", block_spread, " rollover=", block_rollover,
             " prop=", block_prop, " dailyLimits=", block_dailyLimits, " hasPosition=", block_hasPosition,
-            " slTooLarge=", block_slTooLarge, " orderFail=", block_orderFail);
+            " trendFilter=", block_trendFilter, " slTooLarge=", block_slTooLarge, " orderFail=", block_orderFail);
 
       lastPropFirmCheckDay = currentServerDay;
       peakEquityToday = AccountInfoDouble(ACCOUNT_EQUITY);
@@ -1028,6 +1030,7 @@ bool CheckPropFirmProtection()
       block_prop = 0;
       block_dailyLimits = 0;
       block_hasPosition = 0;
+      block_trendFilter = 0;
       block_slTooLarge = 0;
       block_orderFail = 0;
 

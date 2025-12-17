@@ -459,7 +459,8 @@ void DetectSweepAndConfirm()
    }
 
    // Look for new sweep on last closed bar (bar index 1)
-   double highArray[], lowArray[], closeArray[], timeArray[];
+   double highArray[], lowArray[], closeArray[];
+   datetime timeArray[];
    CopyHigh(_Symbol, PERIOD_M5, 1, 1, highArray);
    CopyLow(_Symbol, PERIOD_M5, 1, 1, lowArray);
    CopyClose(_Symbol, PERIOD_M5, 1, 1, closeArray);

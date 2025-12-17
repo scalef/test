@@ -51,6 +51,8 @@ input int RolloverEndMin = 10;                     // Rollover end minute
 input int MagicNumber = 123456;                    // Magic number
 input string OrderComment = "LiqSweep";            // Order comment
 input int SlippagePoints = 30;                     // Slippage in points
+input bool AllowBuy = true;                        // Allow BUY orders
+input bool AllowSell = true;                       // Allow SELL orders
 
 //+------------------------------------------------------------------+
 //| GLOBAL VARIABLES                                                  |
@@ -514,6 +516,19 @@ void DetectSweepAndConfirm()
 //+------------------------------------------------------------------+
 void OpenTrade(int orderType)
 {
+   // Check if direction is allowed
+   if(orderType == OP_BUY && !AllowBuy)
+   {
+      Print("BUY signal ignored (AllowBuy=false)");
+      return;
+   }
+
+   if(orderType == OP_SELL && !AllowSell)
+   {
+      Print("SELL signal ignored (AllowSell=false)");
+      return;
+   }
+
    // Refresh market data
    RefreshRates();
 

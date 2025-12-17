@@ -131,6 +131,16 @@ double dynamicSweepBuffer = 0;
 double dynamicSL_Buffer = 0;
 double dynamicMaxSLDistance = 0;
 
+// Daily block counters
+int block_time = 0;
+int block_spread = 0;
+int block_rollover = 0;
+int block_prop = 0;
+int block_dailyLimits = 0;
+int block_hasPosition = 0;
+int block_slTooLarge = 0;
+int block_orderFail = 0;
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                     |
 //+------------------------------------------------------------------+
@@ -216,12 +226,14 @@ void OnTick()
    // Check prop firm protection FIRST (every tick/bar)
    if(!CheckPropFirmProtection())
    {
+      block_prop++;
       return; // Blocked by prop firm protection
    }
 
    // Check daily profit target and trade limits
    if(!CheckDailyLimits())
    {
+      block_dailyLimits++;
       return; // Blocked by daily limits
    }
 
@@ -248,12 +260,14 @@ void OnTick()
    // Check trading window
    if(!IsInTradingWindow())
    {
+      block_time++;
       return; // Outside trading hours
    }
 
    // Check rollover filter
    if(UseRolloverFilter && IsInRolloverWindow())
    {
+      block_rollover++;
       return; // During rollover period
    }
 
@@ -261,6 +275,7 @@ void OnTick()
    long spreadPoints = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
    if(spreadPoints > MaxSpreadPoints)
    {
+      block_spread++;
       Print("Spread filter triggered: ", spreadPoints, " points (max: ", MaxSpreadPoints, ")");
       return;
    }
@@ -268,6 +283,7 @@ void OnTick()
    // Check if already have open position
    if(HasOpenPosition())
    {
+      block_hasPosition++;
       return; // Already in trade - one position at a time
    }
 
@@ -725,6 +741,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    double slDistance = MathAbs(entryPrice - slPrice);
    if(slDistance > dynamicMaxSLDistance)
    {
+      block_slTooLarge++;
       Print("Skipped: SL distance too large (", DoubleToString(slDistance, 2), " > ", DoubleToString(dynamicMaxSLDistance, 2), ")");
       return;
    }
@@ -792,6 +809,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    }
    else
    {
+      block_orderFail++;
       Print("========================================");
       Print("ORDER SEND FAILED");
       Print("Error code: ", trade.ResultRetcode());
@@ -991,12 +1009,27 @@ bool CheckPropFirmProtection()
    // Check if new day started (server time)
    if(currentServerDay != lastPropFirmCheckDay)
    {
+      // Print daily block statistics before reset
+      Print("DAILY BLOCKS: time=", block_time, " spread=", block_spread, " rollover=", block_rollover,
+            " prop=", block_prop, " dailyLimits=", block_dailyLimits, " hasPosition=", block_hasPosition,
+            " slTooLarge=", block_slTooLarge, " orderFail=", block_orderFail);
+
       lastPropFirmCheckDay = currentServerDay;
       peakEquityToday = AccountInfoDouble(ACCOUNT_EQUITY);
       dayStartEquity = AccountInfoDouble(ACCOUNT_EQUITY);
       blockedToday = false;
       tradesOpenedToday = 0;
       dailyProfitTargetReached = false;
+
+      // Reset daily block counters
+      block_time = 0;
+      block_spread = 0;
+      block_rollover = 0;
+      block_prop = 0;
+      block_dailyLimits = 0;
+      block_hasPosition = 0;
+      block_slTooLarge = 0;
+      block_orderFail = 0;
 
       Print("========================================");
       Print("PROP FIRM: NEW DAY RESET");

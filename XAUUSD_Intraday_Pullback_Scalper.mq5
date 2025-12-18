@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "ScaleF Trading"
 #property link      ""
-#property version   "1.13"
+#property version   "1.14"
 #property strict
 
 //--- Input Group: Money Management
@@ -712,6 +712,10 @@ void UpdateInfoPanel()
       }
    }
 
+   //--- Check if we're on a new bar (for trading)
+   datetime currentBarTime = iTime(_Symbol, PERIOD_M5, 0);
+   bool isNewBar = (currentBarTime != LastBarTime);
+
    //--- Build "Why Not Trading" explanation
    string whyNotTradingList = "";
    int blockReasons = 0;
@@ -747,8 +751,13 @@ void UpdateInfoPanel()
       if(signalAnalysis == "NO SIGNAL")
          whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "No signal";
 
-      if(blockReasons == 0)
+      //--- Special message when there's a signal but waiting for new bar
+      if(blockReasons == 0 && signalAnalysis != "NO SIGNAL" && !isNewBar)
+         whyNotTradingList = "Signal detected - waiting for new M5 bar";
+      else if(blockReasons == 0 && signalAnalysis == "NO SIGNAL")
          whyNotTradingList = "Ready - waiting for signal";
+      else if(blockReasons == 0)
+         whyNotTradingList = "All conditions met - executing";
    }
 
    //--- Determine EA status and reason
@@ -831,7 +840,7 @@ void UpdateInfoPanel()
    int line = 0;
 
    //--- Title
-   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.13", xOffset, yOffset + (line++ * lineHeight) + 8,
+   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.14", xOffset, yOffset + (line++ * lineHeight) + 8,
                clrWhite, 10, "Arial Bold");
    line++; // Skip line
 
@@ -963,6 +972,34 @@ void UpdateInfoPanel()
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_SessionVal", inSession ? "ACTIVE" : "CLOSED",
                xOffset, yOffset + (line++ * lineHeight) + 8, inSession ? clrLime : clrGray, 8, "Arial Bold");
+
+   line++; // Skip line
+
+   //--- Next M5 bar countdown
+   datetime currentTime = TimeCurrent();
+   datetime nextBarTime = currentBarTime + PeriodSeconds(PERIOD_M5);
+   int secondsUntilNewBar = (int)(nextBarTime - currentTime);
+
+   string barStatus = "";
+   color barStatusColor = clrGray;
+
+   if(isNewBar)
+   {
+      barStatus = "NEW BAR - Can trade now!";
+      barStatusColor = clrYellow;
+   }
+   else
+   {
+      int minutes = secondsUntilNewBar / 60;
+      int seconds = secondsUntilNewBar % 60;
+      barStatus = StringFormat("Next bar in %d:%02d", minutes, seconds);
+      barStatusColor = clrGray;
+   }
+
+   CreateLabel("InfoPanel_NextBarLbl", "M5 Bar:", xOffset + 180, yOffset + (line * lineHeight) + 8,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_NextBarVal", barStatus,
+               xOffset, yOffset + (line++ * lineHeight) + 8, barStatusColor, 8, "Arial Bold");
 
    //--- Redraw chart
    ChartRedraw(0);

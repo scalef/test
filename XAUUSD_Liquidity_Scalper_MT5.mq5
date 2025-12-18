@@ -4,7 +4,7 @@
 //|                                       For XAUUSD M5 Timeframe     |
 //+------------------------------------------------------------------+
 #property copyright "Liquidity Sweep Scalper MT5"
-#property version   "1.00"
+#property version   "2.00"
 #property strict
 #property description "Scalping strategy based on liquidity sweeps and reversals"
 #property description "Targets: PDH/PDL, Asia High/Low, Equal Highs/Lows"
@@ -14,73 +14,64 @@
 //+------------------------------------------------------------------+
 //| INPUT PARAMETERS                                                  |
 //+------------------------------------------------------------------+
-// Money Management
+//--- Money Management
+input group "Money Management"
 input double RiskPercent = 0.5;                    // Risk per trade (%)
 input double RR = 1.4;                             // Risk:Reward ratio
 
-// Strategy Parameters
-input double SweepBuffer = 0.40;                   // Sweep buffer (dollars)
-input double SL_Buffer = 0.40;                     // Stop Loss buffer (dollars)
+//--- Core Strategy
+input group "Core Strategy"
+input double SweepBuffer = 0.40;                   // Sweep buffer (fixed, dollars)
+input double SL_Buffer = 0.40;                     // SL buffer (fixed, dollars)
+input double MaxSLDistance = 2.0;                  // Max SL distance (fixed, dollars)
+input bool UseATRBuffers = true;                   // Use ATR-based buffers instead
+input int ATRPeriod = 14;                          // ATR period
+input double K_sweep = 0.35;                       // ATR multiplier for sweep buffer
+input double K_sl = 0.25;                          // ATR multiplier for SL buffer
+input double K_maxsl = 1.20;                       // ATR multiplier for max SL
 input double EQ_Tolerance = 0.50;                  // Equal highs/lows tolerance (dollars)
 input int LookbackEQ_Bars = 60;                    // Lookback bars for EQ levels
 input int ConfirmBars = 2;                         // Confirmation bars window
 input int MaxSpreadPoints = 36;                    // Max spread in points
+input bool UseTrendFilter = true;                  // Use H1 trend filter
+input int FastEMA = 50;                            // Fast EMA period (H1)
+input int SlowEMA = 200;                           // Slow EMA period (H1)
 
-// Trading Hours
+//--- Sessions
+input group "Sessions"
 input int TradeStartHour = 7;                      // Trading window start hour
 input int TradeStartMin = 0;                       // Trading window start minute
 input int TradeEndHour = 17;                       // Trading window end hour
 input int TradeEndMin = 0;                         // Trading window end minute
-
-// Asia Session Parameters
 input int AsiaStartHour = 0;                       // Asia session start hour
 input int AsiaStartMin = 0;                        // Asia session start minute
 input int AsiaEndHour = 6;                         // Asia session end hour
 input int AsiaEndMin = 0;                          // Asia session end minute
-
-// Risk Management
-input double DailyLossLimitPercent = 2.5;          // Daily loss limit (%)
-input int MaxConsecutiveLosses = 3;                // Max consecutive losses
-
-// Rollover Filter
 input bool UseRolloverFilter = true;               // Use rollover filter
 input int RolloverStartHour = 23;                  // Rollover start hour
 input int RolloverStartMin = 55;                   // Rollover start minute
 input int RolloverEndHour = 0;                     // Rollover end hour
 input int RolloverEndMin = 10;                     // Rollover end minute
 
-// Order Settings
+//--- Prop Protection
+input group "Prop Protection"
+input double InitialBalance = 100000.0;            // Initial balance
+input double DailyLossPct = 0.05;                  // Daily loss limit (5%)
+input double MaxLossPct = 0.10;                    // Max total loss (10%)
+input double DailyStopNewTradesAt = 0.70;          // Stop new trades at 70% of daily
+input double DailyCloseAllAt = 0.85;               // Close all at 85% of daily
+input double MaxLossStopBuffer = 500.0;            // Buffer above max loss floor
+input bool UseDailyProfitTarget = true;            // Use daily profit target
+input double DailyProfitTarget = 1600.0;           // Daily profit target ($)
+input int MaxTradesPerDay = 2;                     // Max trades per day
+
+//--- Debug
+input group "Debug"
 input ulong MagicNumber = 123456;                  // Magic number
 input string OrderComment = "LiqSweep";            // Order comment
 input int SlippagePoints = 30;                     // Slippage in points
 input bool AllowBuy = true;                        // Allow BUY orders
 input bool AllowSell = true;                       // Allow SELL orders
-
-// Prop Firm Protection (FundedNext Stellar 2-Step defaults)
-input double InitialBalance = 100000.0;            // Initial balance for prop firm
-input double DailyLossPct = 0.05;                  // Daily loss limit (5%)
-input double MaxLossPct = 0.10;                    // Max total loss (10%)
-input double DailyStopNewTradesAt = 0.70;          // Stop new trades at 70% of daily limit
-input double DailyCloseAllAt = 0.85;               // Close all at 85% of daily limit
-input double MaxLossStopBuffer = 500.0;            // Buffer above max loss floor
-
-// Daily Profit Target and Trade Limits
-input bool UseDailyProfitTarget = true;            // Use daily profit target
-input double DailyProfitTarget = 1600.0;           // Daily profit target ($)
-input int MaxTradesPerDay = 2;                     // Max trades per day
-input double MaxSLDistance = 2.0;                  // Max SL distance (dollars)
-
-// HTF Trend Filter
-input bool UseTrendFilter = true;                  // Use H1 trend filter
-input int FastEMA = 50;                            // Fast EMA period
-input int SlowEMA = 200;                           // Slow EMA period
-
-// ATR-Based Buffers
-input bool UseATRBuffers = true;                   // Use ATR-based buffers
-input int ATRPeriod = 14;                          // ATR period
-input double K_sweep = 0.35;                       // ATR multiplier for sweep buffer
-input double K_sl = 0.25;                          // ATR multiplier for SL buffer
-input double K_maxsl = 1.20;                       // ATR multiplier for max SL distance
 
 //+------------------------------------------------------------------+
 //| GLOBAL VARIABLES                                                  |
@@ -108,13 +99,6 @@ double sweepHigh = 0;
 double sweepLow = 0;
 int sweepBarsElapsed = 0;
 
-// Daily risk management
-datetime currentDay = 0;
-double dailyPL = 0;
-int consecutiveLosses = 0;
-bool dailyTradingBlocked = false;
-double dayStartBalance = 0;
-
 // Prop Firm Protection
 double peakEquityToday = 0;
 bool blockedToday = false;
@@ -126,10 +110,10 @@ double dayStartEquity = 0;
 int tradesOpenedToday = 0;
 bool dailyProfitTargetReached = false;
 
-// Dynamic buffers (ATR-based or fixed)
-double dynamicSweepBuffer = 0;
-double dynamicSL_Buffer = 0;
-double dynamicMaxSLDistance = 0;
+// Internal buffers (calculated from ATR or fixed inputs)
+double sb = 0;        // Sweep buffer
+double slb = 0;       // SL buffer
+double maxsl = 0;     // Max SL distance
 
 // Daily block counters
 int block_time = 0;
@@ -172,12 +156,6 @@ int OnInit()
    trade.SetTypeFilling(ORDER_FILLING_FOK);
    trade.SetAsyncMode(false);
 
-   // Initialize daily tracking
-   datetime timeArray[];
-   CopyTime(_Symbol, PERIOD_D1, 0, 1, timeArray);
-   currentDay = timeArray[0];
-   dayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-
    // Initialize prop firm protection
    MqlDateTime dt;
    TimeTradeServer(dt);
@@ -197,6 +175,7 @@ int OnInit()
    Print("  Current Equity: $", DoubleToString(peakEquityToday, 2));
    Print("  Daily Profit Target: ", UseDailyProfitTarget ? ("$" + DoubleToString(DailyProfitTarget, 2)) : "Disabled");
    Print("  Max Trades Per Day: ", MaxTradesPerDay);
+   Print("  Buffer Mode: ", UseATRBuffers ? "ATR-based" : "Fixed");
 
    return(INIT_SUCCEEDED);
 }
@@ -209,7 +188,6 @@ void OnDeinit(const int reason)
    Print("========================================");
    Print("EA DEINITIALIZED");
    Print("Reason code: ", reason);
-   Print("Final daily P/L: ", DoubleToString(dailyPL, 2));
    Print("========================================");
 }
 
@@ -221,8 +199,8 @@ void OnTick()
    // Execute logic only on new bar (M5)
    if(!IsNewBar()) return;
 
-   // Update dynamic buffers (ATR-based or fixed)
-   UpdateDynamicBuffers();
+   // Update internal buffers (ATR-based or fixed)
+   UpdateBuffers();
 
    // Check prop firm protection FIRST (every tick/bar)
    if(!CheckPropFirmProtection())
@@ -244,19 +222,10 @@ void OnTick()
       sweepBarsElapsed++;
    }
 
-   // Update daily risk state and check for new day
-   UpdateDailyRiskState();
-
    // Update all liquidity levels
    UpdateDailyLevels();
    UpdateAsiaLevels();
    UpdateEqualLevels();
-
-   // Check if trading is blocked
-   if(dailyTradingBlocked)
-   {
-      return; // Silent block - already logged when triggered
-   }
 
    // Check trading window
    if(!IsInTradingWindow())
@@ -361,22 +330,6 @@ bool IsInRolloverWindow()
 //+------------------------------------------------------------------+
 void UpdateDailyLevels()
 {
-   datetime timeArray[];
-   CopyTime(_Symbol, PERIOD_D1, 0, 1, timeArray);
-   datetime today = timeArray[0];
-
-   // Check if new day started
-   if(today != currentDay)
-   {
-      currentDay = today;
-      dayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-      dailyPL = 0;
-      consecutiveLosses = 0;
-      dailyTradingBlocked = false;
-      Print("*** NEW DAY STARTED - Daily counters reset ***");
-      Print("Day start balance: $", DoubleToString(dayStartBalance, 2));
-   }
-
    // Get previous day's high and low
    double highArray[], lowArray[];
    CopyHigh(_Symbol, PERIOD_D1, 1, 1, highArray);
@@ -594,7 +547,7 @@ void DetectSweepAndConfirm()
       double L = levelsUp[i];
 
       // Sweep condition: High >= L + buffer AND Close < L (rejection)
-      if(high1 >= L + dynamicSweepBuffer && close1 < L)
+      if(high1 >= L + sb && close1 < L)
       {
          sweepActive = true;
          sweepDirection = 1; // SELL setup
@@ -636,7 +589,7 @@ void DetectSweepAndConfirm()
       double L = levelsDown[i];
 
       // Sweep condition: Low <= L - buffer AND Close > L (rejection)
-      if(low1 <= L - dynamicSweepBuffer && close1 > L)
+      if(low1 <= L - sb && close1 > L)
       {
          sweepActive = true;
          sweepDirection = -1; // BUY setup
@@ -702,7 +655,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    if(orderType == ORDER_TYPE_SELL)
    {
       entryPrice = bid;
-      slPrice = sweepHigh + dynamicSL_Buffer;
+      slPrice = sweepHigh + slb;
       risk = slPrice - entryPrice;
 
       if(risk <= 0)
@@ -716,7 +669,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
    else if(orderType == ORDER_TYPE_BUY)
    {
       entryPrice = ask;
-      slPrice = sweepLow - dynamicSL_Buffer;
+      slPrice = sweepLow - slb;
       risk = entryPrice - slPrice;
 
       if(risk <= 0)
@@ -735,10 +688,10 @@ void OpenTrade(ENUM_ORDER_TYPE orderType)
 
    // Check max SL distance
    double slDistance = MathAbs(entryPrice - slPrice);
-   if(slDistance > dynamicMaxSLDistance)
+   if(slDistance > maxsl)
    {
       block_slTooLarge++;
-      Print("Skipped: SL distance too large (", DoubleToString(slDistance, 2), " > ", DoubleToString(dynamicMaxSLDistance, 2), ")");
+      Print("Skipped: SL distance too large (", DoubleToString(slDistance, 2), " > ", DoubleToString(maxsl, 2), ")");
       return;
    }
 
@@ -898,92 +851,6 @@ bool HasOpenPosition()
       }
    }
    return false;
-}
-
-//+------------------------------------------------------------------+
-//| Update daily P/L and check risk limits                            |
-//+------------------------------------------------------------------+
-void UpdateDailyRiskState()
-{
-   // Calculate today's P/L from closed trades
-   double todayPL = 0;
-   int tempConsecutiveLosses = 0;
-   bool lastWasLoss = true;
-
-   datetime timeArray[];
-   CopyTime(_Symbol, PERIOD_D1, 0, 1, timeArray);
-   datetime todayStart = timeArray[0];
-
-   // Request history for today
-   HistorySelect(todayStart, TimeCurrent());
-
-   // Scan deals from most recent to oldest
-   int totalDeals = HistoryDealsTotal();
-   for(int i = totalDeals - 1; i >= 0; i--)
-   {
-      ulong ticket = HistoryDealGetTicket(i);
-      if(ticket > 0)
-      {
-         if(HistoryDealGetString(ticket, DEAL_SYMBOL) == _Symbol &&
-            HistoryDealGetInteger(ticket, DEAL_MAGIC) == MagicNumber)
-         {
-            long dealEntry = HistoryDealGetInteger(ticket, DEAL_ENTRY);
-
-            // Only count exit deals (closing positions)
-            if(dealEntry == DEAL_ENTRY_OUT || dealEntry == DEAL_ENTRY_OUT_BY)
-            {
-               double profit = HistoryDealGetDouble(ticket, DEAL_PROFIT);
-               double swap = HistoryDealGetDouble(ticket, DEAL_SWAP);
-               double commission = HistoryDealGetDouble(ticket, DEAL_COMMISSION);
-
-               double totalProfit = profit + swap + commission;
-               todayPL += totalProfit;
-
-               // Count consecutive losses (from most recent backward)
-               if(lastWasLoss)
-               {
-                  if(totalProfit < -0.01) // Loss
-                  {
-                     tempConsecutiveLosses++;
-                  }
-                  else if(totalProfit > 0.01) // Win
-                  {
-                     lastWasLoss = false;
-                  }
-               }
-            }
-         }
-      }
-   }
-
-   dailyPL = todayPL;
-   consecutiveLosses = tempConsecutiveLosses;
-
-   // Check daily loss limit (use day start balance, not current balance)
-   double dailyLossLimit = dayStartBalance * DailyLossLimitPercent / 100.0;
-
-   if(dailyPL < -dailyLossLimit && !dailyTradingBlocked)
-   {
-      dailyTradingBlocked = true;
-      Print("========================================");
-      Print("DAILY LOSS LIMIT REACHED");
-      Print("Daily P/L: $", DoubleToString(dailyPL, 2));
-      Print("Limit: $", DoubleToString(-dailyLossLimit, 2), " (", DailyLossLimitPercent, "% of $", DoubleToString(dayStartBalance, 2), ")");
-      Print("Trading BLOCKED for remainder of day");
-      Print("========================================");
-   }
-
-   // Check consecutive losses limit
-   if(consecutiveLosses >= MaxConsecutiveLosses && !dailyTradingBlocked)
-   {
-      dailyTradingBlocked = true;
-      Print("========================================");
-      Print("MAX CONSECUTIVE LOSSES REACHED");
-      Print("Consecutive losses: ", consecutiveLosses);
-      Print("Limit: ", MaxConsecutiveLosses);
-      Print("Trading BLOCKED for remainder of day");
-      Print("========================================");
-   }
 }
 
 //+------------------------------------------------------------------+
@@ -1164,16 +1031,16 @@ void CloseAllPositions(string reason)
 }
 
 //+------------------------------------------------------------------+
-//| Update Dynamic Buffers (ATR-based or fixed)                      |
+//| Update Internal Buffers (ATR-based or fixed)                     |
 //+------------------------------------------------------------------+
-void UpdateDynamicBuffers()
+void UpdateBuffers()
 {
    if(!UseATRBuffers)
    {
       // Use fixed values from inputs
-      dynamicSweepBuffer = SweepBuffer;
-      dynamicSL_Buffer = SL_Buffer;
-      dynamicMaxSLDistance = MaxSLDistance;
+      sb = SweepBuffer;
+      slb = SL_Buffer;
+      maxsl = MaxSLDistance;
       return;
    }
 
@@ -1186,9 +1053,9 @@ void UpdateDynamicBuffers()
    {
       Print("ERROR: Failed to create ATR indicator handle");
       // Fallback to fixed values
-      dynamicSweepBuffer = SweepBuffer;
-      dynamicSL_Buffer = SL_Buffer;
-      dynamicMaxSLDistance = MaxSLDistance;
+      sb = SweepBuffer;
+      slb = SL_Buffer;
+      maxsl = MaxSLDistance;
       return;
    }
 
@@ -1196,18 +1063,18 @@ void UpdateDynamicBuffers()
    {
       Print("ERROR: Failed to copy ATR buffer");
       // Fallback to fixed values
-      dynamicSweepBuffer = SweepBuffer;
-      dynamicSL_Buffer = SL_Buffer;
-      dynamicMaxSLDistance = MaxSLDistance;
+      sb = SweepBuffer;
+      slb = SL_Buffer;
+      maxsl = MaxSLDistance;
       return;
    }
 
    double atr = atrArray[0];
 
    // Calculate dynamic buffers based on ATR
-   dynamicSweepBuffer = atr * K_sweep;
-   dynamicSL_Buffer = atr * K_sl;
-   dynamicMaxSLDistance = atr * K_maxsl;
+   sb = atr * K_sweep;
+   slb = atr * K_sl;
+   maxsl = atr * K_maxsl;
 
    IndicatorRelease(atrHandle);
 }

@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "ScaleF Trading"
 #property link      ""
-#property version   "1.12"
+#property version   "1.13"
 #property strict
 
 //--- Input Group: Money Management
@@ -640,11 +640,123 @@ void UpdateInfoPanel()
       trendColor = clrYellow;
    }
 
+   //--- Analyze M5 signals
+   string signalAnalysis = "Analyzing...";
+   color signalColor = clrGray;
+   string pullbackStatus = "N/A";
+   string breakoutStatus = "N/A";
+   string whyNotTrading = "";
+
+   double ema_m5[], close[], high[], low[];
+   ArraySetAsSeries(ema_m5, true);
+   ArraySetAsSeries(close, true);
+   ArraySetAsSeries(high, true);
+   ArraySetAsSeries(low, true);
+
+   bool canAnalyze = false;
+   if(CopyBuffer(HandleEMA_M5, 0, 0, 3, ema_m5) >= 3 &&
+      CopyClose(_Symbol, PERIOD_M5, 0, 3, close) >= 3 &&
+      CopyHigh(_Symbol, PERIOD_M5, 0, 3, high) >= 3 &&
+      CopyLow(_Symbol, PERIOD_M5, 0, 3, low) >= 3)
+   {
+      canAnalyze = true;
+
+      //--- Check BUY conditions
+      bool buyPullbackReclaim = (close[2] < ema_m5[2]) && (close[1] > ema_m5[1]);
+      bool buyMicroBreakout = (close[1] > high[2]);
+      bool buySignal = buyPullbackReclaim && buyMicroBreakout;
+
+      //--- Check SELL conditions
+      bool sellPullbackReclaim = (close[2] > ema_m5[2]) && (close[1] < ema_m5[1]);
+      bool sellMicroBreakout = (close[1] < low[2]);
+      bool sellSignal = sellPullbackReclaim && sellMicroBreakout;
+
+      //--- Determine signal status
+      if(buySignal)
+      {
+         signalAnalysis = "BUY SIGNAL";
+         signalColor = clrLime;
+         pullbackStatus = "BUY Reclaim";
+         breakoutStatus = "BUY Breakout";
+      }
+      else if(sellSignal)
+      {
+         signalAnalysis = "SELL SIGNAL";
+         signalColor = clrRed;
+         pullbackStatus = "SELL Reclaim";
+         breakoutStatus = "SELL Breakout";
+      }
+      else
+      {
+         signalAnalysis = "NO SIGNAL";
+         signalColor = clrGray;
+
+         //--- Explain why no signal
+         if(close[1] > ema_m5[1] && close[2] > ema_m5[2])
+            pullbackStatus = "Above EMA (no pullback)";
+         else if(close[1] < ema_m5[1] && close[2] < ema_m5[2])
+            pullbackStatus = "Below EMA (no pullback)";
+         else if(buyPullbackReclaim)
+            pullbackStatus = "BUY Reclaim OK";
+         else if(sellPullbackReclaim)
+            pullbackStatus = "SELL Reclaim OK";
+         else
+            pullbackStatus = "No reclaim detected";
+
+         if(buyMicroBreakout)
+            breakoutStatus = "BUY breakout OK";
+         else if(sellMicroBreakout)
+            breakoutStatus = "SELL breakout OK";
+         else
+            breakoutStatus = "No breakout";
+      }
+   }
+
+   //--- Build "Why Not Trading" explanation
+   string whyNotTradingList = "";
+   int blockReasons = 0;
+
+   double equityDrawdownPct = ((PeakEquityToday - currentEquity) / InitialBalance);
+   double totalDrawdownPct = ((InitialBalance - currentEquity) / InitialBalance);
+
+   int openPositions = CountOpenPositions();
+
+   if(openPositions > 0)
+      whyNotTradingList = "Position already open";
+   else
+   {
+      if(equityDrawdownPct >= DailyLossPct * 0.85)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Daily Loss 85%";
+      else if(equityDrawdownPct >= DailyLossPct * 0.70)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Daily Loss 70%";
+
+      if(totalDrawdownPct >= MaxLossPct * 0.85)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Total Loss 85%";
+      else if(totalDrawdownPct >= MaxLossPct * 0.70)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Total Loss 70%";
+
+      if(UseDailyProfitTarget && dailyProfitPct >= DailyProfitTarget)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Profit target reached";
+
+      if(TradesToday >= MaxTradesPerDay)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Max trades reached";
+
+      if(!inSession)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Out of session";
+
+      if(spread > MaxSpreadPoints)
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "Spread too high";
+
+      if(signalAnalysis == "NO SIGNAL")
+         whyNotTradingList = whyNotTradingList + (blockReasons++ > 0 ? ", " : "") + "No signal";
+
+      if(blockReasons == 0)
+         whyNotTradingList = "Ready - waiting for signal";
+   }
+
    //--- Determine EA status and reason
    string statusMsg = "";
    color statusColor = clrLime;
-
-   int openPositions = CountOpenPositions();
 
    if(openPositions > 0)
    {
@@ -722,7 +834,7 @@ void UpdateInfoPanel()
    int line = 0;
 
    //--- Title
-   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.12", xOffset, yOffset + (line++ * lineHeight) + 8,
+   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.13", xOffset, yOffset + (line++ * lineHeight) + 8,
                clrWhite, 10, "Arial Bold");
    line++; // Skip line
 
@@ -737,6 +849,53 @@ void UpdateInfoPanel()
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_TrendVal", trendStr, xOffset, yOffset + (line++ * lineHeight) + 8,
                trendColor, 8, "Arial Bold");
+
+   line++; // Skip line
+
+   //--- Signal Analysis Section
+   CreateLabel("InfoPanel_SignalTitle", "--- SIGNAL M5 ---", xOffset + 90, yOffset + (line++ * lineHeight) + 8,
+               clrYellow, 8, "Arial Bold");
+
+   CreateLabel("InfoPanel_SignalLbl", "Signal:", xOffset + 180, yOffset + (line * lineHeight) + 8,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_SignalVal", signalAnalysis, xOffset, yOffset + (line++ * lineHeight) + 8,
+               signalColor, 8, "Arial Bold");
+
+   CreateLabel("InfoPanel_PullbackLbl", "Pullback:", xOffset + 180, yOffset + (line * lineHeight) + 8,
+               clrWhite, 8, "Arial");
+   color pullbackColor = (StringFind(pullbackStatus, "OK") >= 0 || StringFind(pullbackStatus, "Reclaim") >= 0) ? clrLime : clrGray;
+   CreateLabel("InfoPanel_PullbackVal", pullbackStatus, xOffset, yOffset + (line++ * lineHeight) + 8,
+               pullbackColor, 8, "Arial");
+
+   CreateLabel("InfoPanel_BreakoutLbl", "Breakout:", xOffset + 180, yOffset + (line * lineHeight) + 8,
+               clrWhite, 8, "Arial");
+   color breakoutColor = (StringFind(breakoutStatus, "OK") >= 0 || StringFind(breakoutStatus, "Breakout") >= 0 && StringFind(breakoutStatus, "No") < 0) ? clrLime : clrGray;
+   CreateLabel("InfoPanel_BreakoutVal", breakoutStatus, xOffset, yOffset + (line++ * lineHeight) + 8,
+               breakoutColor, 8, "Arial");
+
+   //--- Current M5 levels
+   if(canAnalyze)
+   {
+      CreateLabel("InfoPanel_Close1Lbl", "Close[1]:", xOffset + 180, yOffset + (line * lineHeight) + 8,
+                  clrWhite, 8, "Arial");
+      color close1Color = close[1] > ema_m5[1] ? clrLime : clrRed;
+      CreateLabel("InfoPanel_Close1Val", DoubleToString(close[1], _Digits), xOffset, yOffset + (line++ * lineHeight) + 8,
+                  close1Color, 8, "Arial");
+
+      CreateLabel("InfoPanel_EMA20Lbl", "EMA20[1]:", xOffset + 180, yOffset + (line * lineHeight) + 8,
+                  clrWhite, 8, "Arial");
+      CreateLabel("InfoPanel_EMA20Val", DoubleToString(ema_m5[1], _Digits), xOffset, yOffset + (line++ * lineHeight) + 8,
+                  clrAqua, 8, "Arial");
+   }
+
+   line++; // Skip line
+
+   //--- Why Not Trading explanation
+   CreateLabel("InfoPanel_WhyNotTitle", "Why Not Trading:", xOffset + 180, yOffset + (line * lineHeight) + 8,
+               clrYellow, 8, "Arial Bold");
+   color whyColor = (whyNotTradingList == "Ready - waiting for signal") ? clrLime : clrOrange;
+   CreateLabel("InfoPanel_WhyNotVal", whyNotTradingList, xOffset, yOffset + (line++ * lineHeight) + 8,
+               whyColor, 7, "Arial");
 
    line++; // Skip line
 

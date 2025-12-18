@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "ScaleF Trading"
 #property link      ""
-#property version   "1.10"
+#property version   "1.11"
 #property strict
 
 //--- Input Group: Money Management
@@ -113,6 +113,13 @@ int OnInit()
       }
    }
 
+   //--- Set timer for panel updates (every 1 second)
+   EventSetTimer(1);
+
+   //--- Create info panel immediately
+   if(ShowInfoPanel)
+      UpdateInfoPanel();
+
    Print("XAUUSD Intraday Pullback Scalper initialized successfully");
    return(INIT_SUCCEEDED);
 }
@@ -122,6 +129,9 @@ int OnInit()
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
 {
+   //--- Kill timer
+   EventKillTimer();
+
    //--- Release indicator handles
    if(HandleEMA_M5 != INVALID_HANDLE)
       IndicatorRelease(HandleEMA_M5);
@@ -135,6 +145,15 @@ void OnDeinit(const int reason)
    //--- Remove info panel objects
    ObjectsDeleteAll(0, "InfoPanel_");
    ChartRedraw(0);
+}
+
+//+------------------------------------------------------------------+
+//| Timer function (updates panel every second)                      |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   if(ShowInfoPanel)
+      UpdateInfoPanel();
 }
 
 //+------------------------------------------------------------------+
@@ -682,116 +701,116 @@ void UpdateInfoPanel()
    int xOffset = 10;
    int yOffset = 20;
    int lineHeight = 18;
-   int panelWidth = 280;
-   int panelHeight = 280;
+   int panelWidth = 300;
+   int panelHeight = 290;
 
    //--- Create background panel
    string panelName = "InfoPanel_Background";
-   if(ObjectFind(0, panelName) < 0)
-   {
-      ObjectCreate(0, panelName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-      ObjectSetInteger(0, panelName, OBJPROP_XDISTANCE, xOffset);
-      ObjectSetInteger(0, panelName, OBJPROP_YDISTANCE, yOffset);
-      ObjectSetInteger(0, panelName, OBJPROP_XSIZE, panelWidth);
-      ObjectSetInteger(0, panelName, OBJPROP_YSIZE, panelHeight);
-      ObjectSetInteger(0, panelName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-      ObjectSetInteger(0, panelName, OBJPROP_BGCOLOR, PanelColor);
-      ObjectSetInteger(0, panelName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-      ObjectSetInteger(0, panelName, OBJPROP_COLOR, clrWhite);
-      ObjectSetInteger(0, panelName, OBJPROP_WIDTH, 1);
-      ObjectSetInteger(0, panelName, OBJPROP_BACK, false);
-      ObjectSetInteger(0, panelName, OBJPROP_SELECTABLE, false);
-   }
+   ObjectDelete(0, panelName); // Delete and recreate to ensure visibility
+   ObjectCreate(0, panelName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(0, panelName, OBJPROP_XDISTANCE, xOffset);
+   ObjectSetInteger(0, panelName, OBJPROP_YDISTANCE, yOffset);
+   ObjectSetInteger(0, panelName, OBJPROP_XSIZE, panelWidth);
+   ObjectSetInteger(0, panelName, OBJPROP_YSIZE, panelHeight);
+   ObjectSetInteger(0, panelName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, panelName, OBJPROP_BGCOLOR, PanelColor);
+   ObjectSetInteger(0, panelName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, panelName, OBJPROP_COLOR, clrWhite);
+   ObjectSetInteger(0, panelName, OBJPROP_WIDTH, 2);
+   ObjectSetInteger(0, panelName, OBJPROP_BACK, true);
+   ObjectSetInteger(0, panelName, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, panelName, OBJPROP_HIDDEN, false);
 
    //--- Create text labels
    int line = 0;
+   int labelX = panelWidth - 15; // Position from right edge of panel
 
    //--- Title
-   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.10", xOffset + 10, yOffset + (line++ * lineHeight) + 5,
+   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.11", xOffset + labelX, yOffset + (line++ * lineHeight) + 8,
                clrWhite, 10, "Arial Bold");
    line++; // Skip line
 
    //--- Status
-   CreateLabel("InfoPanel_StatusLbl", "Status:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_StatusLbl", "Status:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
-   CreateLabel("InfoPanel_StatusVal", statusMsg, xOffset + 70, yOffset + (line++ * lineHeight) + 5,
+   CreateLabel("InfoPanel_StatusVal", statusMsg, xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8,
                statusColor, 8, "Arial Bold");
 
    //--- Trend H1
-   CreateLabel("InfoPanel_TrendLbl", "Trend H1:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_TrendLbl", "Trend H1:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
-   CreateLabel("InfoPanel_TrendVal", trendStr, xOffset + 70, yOffset + (line++ * lineHeight) + 5,
+   CreateLabel("InfoPanel_TrendVal", trendStr, xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8,
                trendColor, 8, "Arial Bold");
 
    line++; // Skip line
 
    //--- Equity & Balance
-   CreateLabel("InfoPanel_EquityLbl", "Equity:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_EquityLbl", "Equity:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_EquityVal", DoubleToString(currentEquity, 2) + " " + AccountInfoString(ACCOUNT_CURRENCY),
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
-   CreateLabel("InfoPanel_BalanceLbl", "Balance:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_BalanceLbl", "Balance:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_BalanceVal", DoubleToString(InitialBalance, 2) + " " + AccountInfoString(ACCOUNT_CURRENCY),
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
    line++; // Skip line
 
    //--- Daily profit/loss
    color profitColor = dailyProfitPct >= 0 ? clrLime : clrRed;
-   CreateLabel("InfoPanel_DailyPLLbl", "Daily P/L:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_DailyPLLbl", "Daily P/L:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_DailyPLVal", (dailyProfitPct >= 0 ? "+" : "") + DoubleToString(dailyProfitPct, 2) + "%",
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, profitColor, 8, "Arial Bold");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, profitColor, 8, "Arial Bold");
 
    //--- Daily drawdown
    color ddColor = equityDrawdownPct < DailyLossPct * 0.5 ? clrLime :
                    equityDrawdownPct < DailyLossPct * 0.7 ? clrYellow : clrRed;
-   CreateLabel("InfoPanel_DailyDDLbl", "Daily DD:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_DailyDDLbl", "Daily DD:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_DailyDDVal", DoubleToString(equityDrawdownPct, 2) + "% / " +
                DoubleToString(DailyLossPct * 100, 1) + "%",
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, ddColor, 8, "Arial");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, ddColor, 8, "Arial");
 
    //--- Total drawdown
    color totalDDColor = totalDrawdownPct < MaxLossPct * 0.5 ? clrLime :
                         totalDrawdownPct < MaxLossPct * 0.7 ? clrYellow : clrRed;
-   CreateLabel("InfoPanel_TotalDDLbl", "Total DD:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_TotalDDLbl", "Total DD:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_TotalDDVal", DoubleToString(totalDrawdownPct, 2) + "% / " +
                DoubleToString(MaxLossPct * 100, 1) + "%",
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, totalDDColor, 8, "Arial");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, totalDDColor, 8, "Arial");
 
    line++; // Skip line
 
    //--- Trades today
-   CreateLabel("InfoPanel_TradesLbl", "Trades:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_TradesLbl", "Trades:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_TradesVal", IntegerToString(TradesToday) + " / " + IntegerToString(MaxTradesPerDay),
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
    //--- Open positions
-   CreateLabel("InfoPanel_PosLbl", "Open Pos:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_PosLbl", "Open Pos:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_PosVal", IntegerToString(openPositions),
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
    //--- Spread
    color spreadColor = spread <= MaxSpreadPoints * 0.7 ? clrLime :
                        spread <= MaxSpreadPoints ? clrYellow : clrRed;
-   CreateLabel("InfoPanel_SpreadLbl", "Spread:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_SpreadLbl", "Spread:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_SpreadVal", DoubleToString(spread, 1) + " / " + IntegerToString(MaxSpreadPoints) + " pts",
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, spreadColor, 8, "Arial");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, spreadColor, 8, "Arial");
 
    line++; // Skip line
 
    //--- Session status
-   CreateLabel("InfoPanel_SessionLbl", "Session:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+   CreateLabel("InfoPanel_SessionLbl", "Session:", xOffset + labelX, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_SessionVal", inSession ? "ACTIVE" : "CLOSED",
-               xOffset + 70, yOffset + (line++ * lineHeight) + 5, inSession ? clrLime : clrGray, 8, "Arial Bold");
+               xOffset + labelX - 65, yOffset + (line++ * lineHeight) + 8, inSession ? clrLime : clrGray, 8, "Arial Bold");
 
    //--- Redraw chart
    ChartRedraw(0);
@@ -806,9 +825,10 @@ void CreateLabel(string name, string text, int x, int y, color clr, int fontSize
    {
       ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
-      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
+      ObjectSetInteger(0, name, OBJPROP_BACK, false);
    }
 
    ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);

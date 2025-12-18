@@ -701,7 +701,7 @@ void UpdateInfoPanel()
    int xOffset = 10;
    int yOffset = 20;
    int lineHeight = 18;
-   int panelWidth = 240;
+   int panelWidth = 280;
    int panelHeight = 290;
 
    //--- Create background panel
@@ -825,7 +825,7 @@ void CreateLabel(string name, string text, int x, int y, color clr, int fontSize
    {
       ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
       ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
       ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
       ObjectSetInteger(0, name, OBJPROP_HIDDEN, false);
       ObjectSetInteger(0, name, OBJPROP_BACK, false);

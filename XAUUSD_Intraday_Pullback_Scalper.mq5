@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "ScaleF Trading"
 #property link      ""
-#property version   "1.14"
+#property version   "1.15"
 #property strict
 
 //--- Input Group: Money Management
@@ -49,6 +49,12 @@ input double   DailyLossPct       = 0.05;     // Daily loss limit (5%)
 input double   MaxLossPct         = 0.10;     // Max total loss (10%)
 input bool     UseDailyProfitTarget = false;  // Use daily profit target
 input double   DailyProfitTarget  = 3.0;      // Daily profit target (%)
+
+//--- Input Group: Breakeven Management
+input group "=== Breakeven ==="
+input bool     UseBreakeven       = true;     // Enable breakeven
+input double   BE_Trigger_R       = 1.0;      // Trigger breakeven at profit (R multiples)
+input double   BE_Offset_Price    = 0.10;     // Breakeven offset in price (XAUUSD)
 
 //--- Input Group: Display
 input group "=== Display ==="
@@ -180,6 +186,9 @@ void OnTick()
    double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);
    if(currentEquity > PeakEquityToday)
       PeakEquityToday = currentEquity;
+
+   //--- Check and apply breakeven to open positions
+   CheckAndApplyBreakeven();
 
    //--- Prop protection: check drawdown levels
    double equityDrawdownPct = (PeakEquityToday - currentEquity) / InitialBalance;
@@ -593,6 +602,118 @@ void CloseAllPositions()
 }
 
 //+------------------------------------------------------------------+
+//| Check and apply breakeven to open positions                      |
+//+------------------------------------------------------------------+
+void CheckAndApplyBreakeven()
+{
+   if(!UseBreakeven)
+      return;
+
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket <= 0)
+         continue;
+
+      //--- Check if position belongs to this EA
+      if(PositionGetString(POSITION_SYMBOL) != _Symbol ||
+         PositionGetInteger(POSITION_MAGIC) != MagicNumber)
+         continue;
+
+      //--- Get position details
+      double entryPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+      double currentSL = PositionGetDouble(POSITION_SL);
+      double currentTP = PositionGetDouble(POSITION_TP);
+      ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+
+      //--- Calculate initial risk R
+      double R = MathAbs(entryPrice - currentSL);
+      if(R <= 0)
+         continue; // Invalid SL
+
+      //--- Get current prices
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+      double ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+
+      //--- Check if breakeven should be applied
+      bool shouldApplyBE = false;
+      double newSL = 0;
+
+      if(posType == POSITION_TYPE_BUY)
+      {
+         //--- BUY: check if profit >= BE_Trigger_R * R
+         double currentProfit = bid - entryPrice;
+         double targetProfit = BE_Trigger_R * R;
+
+         newSL = entryPrice + BE_Offset_Price;
+
+         //--- Apply BE if profit reached trigger and SL not yet at BE level
+         if(currentProfit >= targetProfit && currentSL < newSL)
+            shouldApplyBE = true;
+      }
+      else // POSITION_TYPE_SELL
+      {
+         //--- SELL: check if profit >= BE_Trigger_R * R
+         double currentProfit = entryPrice - ask;
+         double targetProfit = BE_Trigger_R * R;
+
+         newSL = entryPrice - BE_Offset_Price;
+
+         //--- Apply BE if profit reached trigger and SL not yet at BE level
+         if(currentProfit >= targetProfit && currentSL > newSL)
+            shouldApplyBE = true;
+      }
+
+      //--- Modify position to breakeven
+      if(shouldApplyBE)
+      {
+         //--- Normalize SL price
+         newSL = NormalizeDouble(newSL, _Digits);
+
+         //--- Check minimum stop level
+         double minStopLevel = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
+         double slDistance = posType == POSITION_TYPE_BUY ? (newSL - bid) : (ask - newSL);
+
+         if(MathAbs(slDistance) < minStopLevel)
+         {
+            Print("Breakeven: SL too close to current price for ticket #", ticket);
+            continue;
+         }
+
+         //--- Send modification request
+         MqlTradeRequest request = {};
+         MqlTradeResult result = {};
+
+         request.action = TRADE_ACTION_SLTP;
+         request.position = ticket;
+         request.symbol = _Symbol;
+         request.sl = newSL;
+         request.tp = currentTP; // Keep existing TP
+
+         if(OrderSend(request, result))
+         {
+            if(result.retcode == TRADE_RETCODE_DONE)
+            {
+               Print("Breakeven applied: Ticket #", ticket,
+                     " Type=", EnumToString(posType),
+                     " Entry=", entryPrice,
+                     " New SL=", newSL,
+                     " (Offset=", BE_Offset_Price, ")");
+            }
+            else
+            {
+               Print("Breakeven modification failed: Ticket #", ticket, " RetCode=", result.retcode);
+            }
+         }
+         else
+         {
+            Print("Breakeven OrderSend error: ", GetLastError());
+         }
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Update info panel on chart                                       |
 //+------------------------------------------------------------------+
 void UpdateInfoPanel()
@@ -840,7 +961,7 @@ void UpdateInfoPanel()
    int line = 0;
 
    //--- Title
-   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.14", xOffset, yOffset + (line++ * lineHeight) + 8,
+   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.15", xOffset, yOffset + (line++ * lineHeight) + 8,
                clrWhite, 10, "Arial Bold");
    line++; // Skip line
 

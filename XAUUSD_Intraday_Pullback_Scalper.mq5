@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "ScaleF Trading"
 #property link      ""
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 
 //--- Input Group: Money Management
@@ -50,6 +50,10 @@ input double   MaxLossPct         = 0.10;     // Max total loss (10%)
 input bool     UseDailyProfitTarget = false;  // Use daily profit target
 input double   DailyProfitTarget  = 3.0;      // Daily profit target (%)
 
+//--- Input Group: Display
+input group "=== Display ==="
+input bool     ShowInfoPanel      = true;     // Show info panel
+
 //--- Global variables
 double         InitialBalance;
 double         PeakEquityToday;
@@ -62,6 +66,11 @@ int            HandleEMA_M5;
 int            HandleATR_M5;
 int            HandleFastEMA_H1;
 int            HandleSlowEMA_H1;
+
+//--- Info panel variables
+string         LastStatusMessage  = "Initializing...";
+string         TrendStatus        = "Neutral";
+color          PanelColor         = clrDarkSlateGray;
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -122,6 +131,10 @@ void OnDeinit(const int reason)
       IndicatorRelease(HandleFastEMA_H1);
    if(HandleSlowEMA_H1 != INVALID_HANDLE)
       IndicatorRelease(HandleSlowEMA_H1);
+
+   //--- Remove info panel objects
+   ObjectsDeleteAll(0, "InfoPanel_");
+   ChartRedraw(0);
 }
 
 //+------------------------------------------------------------------+
@@ -356,6 +369,10 @@ void OnTick()
          }
       }
    }
+
+   //--- Update info panel
+   if(ShowInfoPanel)
+      UpdateInfoPanel();
 }
 
 //+------------------------------------------------------------------+
@@ -554,5 +571,251 @@ void CloseAllPositions()
          }
       }
    }
+}
+
+//+------------------------------------------------------------------+
+//| Update info panel on chart                                       |
+//+------------------------------------------------------------------+
+void UpdateInfoPanel()
+{
+   //--- Calculate current statistics
+   double currentEquity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double dailyProfitPct = ((currentEquity - PeakEquityToday) / InitialBalance) * 100.0;
+   double equityDrawdownPct = ((PeakEquityToday - currentEquity) / InitialBalance) * 100.0;
+   double totalDrawdownPct = ((InitialBalance - currentEquity) / InitialBalance) * 100.0;
+
+   //--- Get current spread
+   double spread = GetSpreadInPoints();
+
+   //--- Check trading session
+   bool inSession = IsInTradingSession();
+
+   //--- Get trend direction
+   string trendStr = "N/A";
+   color trendColor = clrGray;
+
+   if(UseTrendFilter && HandleFastEMA_H1 != INVALID_HANDLE && HandleSlowEMA_H1 != INVALID_HANDLE)
+   {
+      double fastEMA_h1[], slowEMA_h1[];
+      ArraySetAsSeries(fastEMA_h1, true);
+      ArraySetAsSeries(slowEMA_h1, true);
+
+      if(CopyBuffer(HandleFastEMA_H1, 0, 0, 1, fastEMA_h1) >= 1 &&
+         CopyBuffer(HandleSlowEMA_H1, 0, 0, 1, slowEMA_h1) >= 1)
+      {
+         if(fastEMA_h1[0] > slowEMA_h1[0])
+         {
+            trendStr = "BULLISH";
+            trendColor = clrLime;
+         }
+         else
+         {
+            trendStr = "BEARISH";
+            trendColor = clrRed;
+         }
+      }
+   }
+   else if(!UseTrendFilter)
+   {
+      trendStr = "OFF";
+      trendColor = clrYellow;
+   }
+
+   //--- Determine EA status and reason
+   string statusMsg = "";
+   color statusColor = clrLime;
+
+   int openPositions = CountOpenPositions();
+
+   if(openPositions > 0)
+   {
+      statusMsg = "POSITION OPEN";
+      statusColor = clrDodgerBlue;
+   }
+   else if(equityDrawdownPct >= DailyLossPct * 0.85)
+   {
+      statusMsg = "STOPPED: Daily Loss 85%";
+      statusColor = clrRed;
+   }
+   else if(totalDrawdownPct >= MaxLossPct * 0.85)
+   {
+      statusMsg = "STOPPED: Total Loss 85%";
+      statusColor = clrRed;
+   }
+   else if(equityDrawdownPct >= DailyLossPct * 0.70)
+   {
+      statusMsg = "BLOCKED: Daily Loss 70%";
+      statusColor = clrOrange;
+   }
+   else if(totalDrawdownPct >= MaxLossPct * 0.70)
+   {
+      statusMsg = "BLOCKED: Total Loss 70%";
+      statusColor = clrOrange;
+   }
+   else if(UseDailyProfitTarget && dailyProfitPct >= DailyProfitTarget)
+   {
+      statusMsg = "TARGET REACHED";
+      statusColor = clrGold;
+   }
+   else if(TradesToday >= MaxTradesPerDay)
+   {
+      statusMsg = "MAX TRADES REACHED";
+      statusColor = clrOrange;
+   }
+   else if(!inSession)
+   {
+      statusMsg = "OUT OF SESSION";
+      statusColor = clrGray;
+   }
+   else if(spread > MaxSpreadPoints)
+   {
+      statusMsg = "SPREAD TOO HIGH";
+      statusColor = clrOrange;
+   }
+   else
+   {
+      statusMsg = "READY TO TRADE";
+      statusColor = clrLime;
+   }
+
+   //--- Panel positioning (top right corner)
+   int xOffset = 10;
+   int yOffset = 20;
+   int lineHeight = 18;
+   int panelWidth = 280;
+   int panelHeight = 280;
+
+   //--- Create background panel
+   string panelName = "InfoPanel_Background";
+   if(ObjectFind(0, panelName) < 0)
+   {
+      ObjectCreate(0, panelName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, panelName, OBJPROP_XDISTANCE, xOffset);
+      ObjectSetInteger(0, panelName, OBJPROP_YDISTANCE, yOffset);
+      ObjectSetInteger(0, panelName, OBJPROP_XSIZE, panelWidth);
+      ObjectSetInteger(0, panelName, OBJPROP_YSIZE, panelHeight);
+      ObjectSetInteger(0, panelName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+      ObjectSetInteger(0, panelName, OBJPROP_BGCOLOR, PanelColor);
+      ObjectSetInteger(0, panelName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+      ObjectSetInteger(0, panelName, OBJPROP_COLOR, clrWhite);
+      ObjectSetInteger(0, panelName, OBJPROP_WIDTH, 1);
+      ObjectSetInteger(0, panelName, OBJPROP_BACK, false);
+      ObjectSetInteger(0, panelName, OBJPROP_SELECTABLE, false);
+   }
+
+   //--- Create text labels
+   int line = 0;
+
+   //--- Title
+   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.10", xOffset + 10, yOffset + (line++ * lineHeight) + 5,
+               clrWhite, 10, "Arial Bold");
+   line++; // Skip line
+
+   //--- Status
+   CreateLabel("InfoPanel_StatusLbl", "Status:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_StatusVal", statusMsg, xOffset + 70, yOffset + (line++ * lineHeight) + 5,
+               statusColor, 8, "Arial Bold");
+
+   //--- Trend H1
+   CreateLabel("InfoPanel_TrendLbl", "Trend H1:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_TrendVal", trendStr, xOffset + 70, yOffset + (line++ * lineHeight) + 5,
+               trendColor, 8, "Arial Bold");
+
+   line++; // Skip line
+
+   //--- Equity & Balance
+   CreateLabel("InfoPanel_EquityLbl", "Equity:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_EquityVal", DoubleToString(currentEquity, 2) + " " + AccountInfoString(ACCOUNT_CURRENCY),
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+
+   CreateLabel("InfoPanel_BalanceLbl", "Balance:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_BalanceVal", DoubleToString(InitialBalance, 2) + " " + AccountInfoString(ACCOUNT_CURRENCY),
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+
+   line++; // Skip line
+
+   //--- Daily profit/loss
+   color profitColor = dailyProfitPct >= 0 ? clrLime : clrRed;
+   CreateLabel("InfoPanel_DailyPLLbl", "Daily P/L:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_DailyPLVal", (dailyProfitPct >= 0 ? "+" : "") + DoubleToString(dailyProfitPct, 2) + "%",
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, profitColor, 8, "Arial Bold");
+
+   //--- Daily drawdown
+   color ddColor = equityDrawdownPct < DailyLossPct * 0.5 ? clrLime :
+                   equityDrawdownPct < DailyLossPct * 0.7 ? clrYellow : clrRed;
+   CreateLabel("InfoPanel_DailyDDLbl", "Daily DD:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_DailyDDVal", DoubleToString(equityDrawdownPct, 2) + "% / " +
+               DoubleToString(DailyLossPct * 100, 1) + "%",
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, ddColor, 8, "Arial");
+
+   //--- Total drawdown
+   color totalDDColor = totalDrawdownPct < MaxLossPct * 0.5 ? clrLime :
+                        totalDrawdownPct < MaxLossPct * 0.7 ? clrYellow : clrRed;
+   CreateLabel("InfoPanel_TotalDDLbl", "Total DD:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_TotalDDVal", DoubleToString(totalDrawdownPct, 2) + "% / " +
+               DoubleToString(MaxLossPct * 100, 1) + "%",
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, totalDDColor, 8, "Arial");
+
+   line++; // Skip line
+
+   //--- Trades today
+   CreateLabel("InfoPanel_TradesLbl", "Trades:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_TradesVal", IntegerToString(TradesToday) + " / " + IntegerToString(MaxTradesPerDay),
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+
+   //--- Open positions
+   CreateLabel("InfoPanel_PosLbl", "Open Pos:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_PosVal", IntegerToString(openPositions),
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, clrAqua, 8, "Arial");
+
+   //--- Spread
+   color spreadColor = spread <= MaxSpreadPoints * 0.7 ? clrLime :
+                       spread <= MaxSpreadPoints ? clrYellow : clrRed;
+   CreateLabel("InfoPanel_SpreadLbl", "Spread:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_SpreadVal", DoubleToString(spread, 1) + " / " + IntegerToString(MaxSpreadPoints) + " pts",
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, spreadColor, 8, "Arial");
+
+   line++; // Skip line
+
+   //--- Session status
+   CreateLabel("InfoPanel_SessionLbl", "Session:", xOffset + 10, yOffset + (line * lineHeight) + 5,
+               clrWhite, 8, "Arial");
+   CreateLabel("InfoPanel_SessionVal", inSession ? "ACTIVE" : "CLOSED",
+               xOffset + 70, yOffset + (line++ * lineHeight) + 5, inSession ? clrLime : clrGray, 8, "Arial Bold");
+
+   //--- Redraw chart
+   ChartRedraw(0);
+}
+
+//+------------------------------------------------------------------+
+//| Create or update text label                                      |
+//+------------------------------------------------------------------+
+void CreateLabel(string name, string text, int x, int y, color clr, int fontSize, string font)
+{
+   if(ObjectFind(0, name) < 0)
+   {
+      ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0);
+      ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_RIGHT_UPPER);
+      ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
+      ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
+   }
+
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, fontSize);
+   ObjectSetString(0, name, OBJPROP_FONT, font);
+   ObjectSetString(0, name, OBJPROP_TEXT, text);
 }
 //+------------------------------------------------------------------+

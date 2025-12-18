@@ -532,18 +532,15 @@ void DetectSweepAndConfirm()
       if(sweepDirection == 1) // Sweep UP -> looking for SELL confirmation
       {
          Print("DEBUG Sweep: Bar ", sweepBarsElapsed, "/", ConfirmBars,
-               " | High[1]=", DoubleToString(high1, _Digits),
                " | Close[1]=", DoubleToString(close1, _Digits),
-               " | Need: Close < ", DoubleToString(sweepLevel, _Digits),
-               " AND High < ", DoubleToString(sweepHigh, _Digits));
+               " | Need: Close < ", DoubleToString(sweepLevel, _Digits));
 
-         // Confirmation: closed below level AND high below sweep high (rejection confirmed)
-         if(close1 < sweepLevel && high1 < sweepHigh)
+         // Confirmation: closed below level
+         if(close1 < sweepLevel)
          {
             Print("========================================");
             Print(">>> SELL CONFIRMATION DETECTED <<<");
             Print("Close[1]: ", DoubleToString(close1, _Digits), " < SweepLevel: ", DoubleToString(sweepLevel, _Digits));
-            Print("High[1]: ", DoubleToString(high1, _Digits), " < SweepHigh: ", DoubleToString(sweepHigh, _Digits));
             Print("========================================");
             OpenTrade(ORDER_TYPE_SELL);
             sweepActive = false;
@@ -552,18 +549,15 @@ void DetectSweepAndConfirm()
       else if(sweepDirection == -1) // Sweep DOWN -> looking for BUY confirmation
       {
          Print("DEBUG Sweep: Bar ", sweepBarsElapsed, "/", ConfirmBars,
-               " | Low[1]=", DoubleToString(low1, _Digits),
                " | Close[1]=", DoubleToString(close1, _Digits),
-               " | Need: Close > ", DoubleToString(sweepLevel, _Digits),
-               " AND Low > ", DoubleToString(sweepLow, _Digits));
+               " | Need: Close > ", DoubleToString(sweepLevel, _Digits));
 
-         // Confirmation: closed above level AND low above sweep low (rejection confirmed)
-         if(close1 > sweepLevel && low1 > sweepLow)
+         // Confirmation: closed above level
+         if(close1 > sweepLevel)
          {
             Print("========================================");
             Print(">>> BUY CONFIRMATION DETECTED <<<");
             Print("Close[1]: ", DoubleToString(close1, _Digits), " > SweepLevel: ", DoubleToString(sweepLevel, _Digits));
-            Print("Low[1]: ", DoubleToString(low1, _Digits), " > SweepLow: ", DoubleToString(sweepLow, _Digits));
             Print("========================================");
             OpenTrade(ORDER_TYPE_BUY);
             sweepActive = false;

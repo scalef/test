@@ -704,22 +704,8 @@ void UpdateInfoPanel()
    int panelWidth = 280;
    int panelHeight = 290;
 
-   //--- Create background panel
-   string panelName = "InfoPanel_Background";
-   ObjectDelete(0, panelName); // Delete and recreate to ensure visibility
-   ObjectCreate(0, panelName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, panelName, OBJPROP_XDISTANCE, xOffset);
-   ObjectSetInteger(0, panelName, OBJPROP_YDISTANCE, yOffset);
-   ObjectSetInteger(0, panelName, OBJPROP_XSIZE, panelWidth);
-   ObjectSetInteger(0, panelName, OBJPROP_YSIZE, panelHeight);
-   ObjectSetInteger(0, panelName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0, panelName, OBJPROP_BGCOLOR, PanelColor);
-   ObjectSetInteger(0, panelName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-   ObjectSetInteger(0, panelName, OBJPROP_COLOR, clrWhite);
-   ObjectSetInteger(0, panelName, OBJPROP_WIDTH, 2);
-   ObjectSetInteger(0, panelName, OBJPROP_BACK, true);
-   ObjectSetInteger(0, panelName, OBJPROP_SELECTABLE, false);
-   ObjectSetInteger(0, panelName, OBJPROP_HIDDEN, false);
+   //--- Background panel removed to avoid covering candles
+   //--- Labels are visible enough without background
 
    //--- Create text labels
    int line = 0;

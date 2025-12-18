@@ -716,9 +716,6 @@ void UpdateInfoPanel()
    string whyNotTradingList = "";
    int blockReasons = 0;
 
-   double equityDrawdownPct = ((PeakEquityToday - currentEquity) / InitialBalance);
-   double totalDrawdownPct = ((InitialBalance - currentEquity) / InitialBalance);
-
    int openPositions = CountOpenPositions();
 
    if(openPositions > 0)
@@ -869,7 +866,7 @@ void UpdateInfoPanel()
 
    CreateLabel("InfoPanel_BreakoutLbl", "Breakout:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
-   color breakoutColor = (StringFind(breakoutStatus, "OK") >= 0 || StringFind(breakoutStatus, "Breakout") >= 0 && StringFind(breakoutStatus, "No") < 0) ? clrLime : clrGray;
+   color breakoutColor = (StringFind(breakoutStatus, "OK") >= 0 || (StringFind(breakoutStatus, "Breakout") >= 0 && StringFind(breakoutStatus, "No") < 0)) ? clrLime : clrGray;
    CreateLabel("InfoPanel_BreakoutVal", breakoutStatus, xOffset, yOffset + (line++ * lineHeight) + 8,
                breakoutColor, 8, "Arial");
 

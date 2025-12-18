@@ -6,7 +6,7 @@
 //+------------------------------------------------------------------+
 #property copyright "ScaleF Trading"
 #property link      ""
-#property version   "1.11"
+#property version   "1.12"
 #property strict
 
 //--- Input Group: Money Management
@@ -683,7 +683,20 @@ void UpdateInfoPanel()
    }
    else if(!inSession)
    {
-      statusMsg = "OUT OF SESSION";
+      //--- Build session info message
+      MqlDateTime dt;
+      TimeCurrent(dt);
+      string currentTime = StringFormat("%02d:%02d", dt.hour, dt.min);
+
+      string sessionInfo = "OUT OF SESSION (" + currentTime + ")";
+      if(UseSession1 && UseSession2)
+         sessionInfo = sessionInfo + " [" + Session1Start + "-" + Session1End + ", " + Session2Start + "-" + Session2End + "]";
+      else if(UseSession1)
+         sessionInfo = sessionInfo + " [" + Session1Start + "-" + Session1End + "]";
+      else if(UseSession2)
+         sessionInfo = sessionInfo + " [" + Session2Start + "-" + Session2End + "]";
+
+      statusMsg = sessionInfo;
       statusColor = clrGray;
    }
    else if(spread > MaxSpreadPoints)
@@ -709,91 +722,91 @@ void UpdateInfoPanel()
    int line = 0;
 
    //--- Title
-   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.11", xOffset, yOffset + (line++ * lineHeight) + 8,
+   CreateLabel("InfoPanel_Title", "XAUUSD SCALPER v1.12", xOffset, yOffset + (line++ * lineHeight) + 8,
                clrWhite, 10, "Arial Bold");
    line++; // Skip line
 
-   //--- Status
-   CreateLabel("InfoPanel_StatusLbl", "Status:", xOffset, yOffset + (line * lineHeight) + 8,
+   //--- Status (swap: label at +180, value at xOffset)
+   CreateLabel("InfoPanel_StatusLbl", "Status:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
-   CreateLabel("InfoPanel_StatusVal", statusMsg, xOffset + 180, yOffset + (line++ * lineHeight) + 8,
+   CreateLabel("InfoPanel_StatusVal", statusMsg, xOffset, yOffset + (line++ * lineHeight) + 8,
                statusColor, 8, "Arial Bold");
 
    //--- Trend H1
-   CreateLabel("InfoPanel_TrendLbl", "Trend H1:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_TrendLbl", "Trend H1:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
-   CreateLabel("InfoPanel_TrendVal", trendStr, xOffset + 180, yOffset + (line++ * lineHeight) + 8,
+   CreateLabel("InfoPanel_TrendVal", trendStr, xOffset, yOffset + (line++ * lineHeight) + 8,
                trendColor, 8, "Arial Bold");
 
    line++; // Skip line
 
    //--- Equity & Balance
-   CreateLabel("InfoPanel_EquityLbl", "Equity:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_EquityLbl", "Equity:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_EquityVal", DoubleToString(currentEquity, 2) + " " + AccountInfoString(ACCOUNT_CURRENCY),
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
+               xOffset, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
-   CreateLabel("InfoPanel_BalanceLbl", "Balance:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_BalanceLbl", "Balance:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_BalanceVal", DoubleToString(InitialBalance, 2) + " " + AccountInfoString(ACCOUNT_CURRENCY),
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
+               xOffset, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
    line++; // Skip line
 
    //--- Daily profit/loss
    color profitColor = dailyProfitPct >= 0 ? clrLime : clrRed;
-   CreateLabel("InfoPanel_DailyPLLbl", "Daily P/L:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_DailyPLLbl", "Daily P/L:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_DailyPLVal", (dailyProfitPct >= 0 ? "+" : "") + DoubleToString(dailyProfitPct, 2) + "%",
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, profitColor, 8, "Arial Bold");
+               xOffset, yOffset + (line++ * lineHeight) + 8, profitColor, 8, "Arial Bold");
 
    //--- Daily drawdown
    color ddColor = equityDrawdownPct < DailyLossPct * 0.5 ? clrLime :
                    equityDrawdownPct < DailyLossPct * 0.7 ? clrYellow : clrRed;
-   CreateLabel("InfoPanel_DailyDDLbl", "Daily DD:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_DailyDDLbl", "Daily DD:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_DailyDDVal", DoubleToString(equityDrawdownPct, 2) + "% / " +
                DoubleToString(DailyLossPct * 100, 1) + "%",
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, ddColor, 8, "Arial");
+               xOffset, yOffset + (line++ * lineHeight) + 8, ddColor, 8, "Arial");
 
    //--- Total drawdown
    color totalDDColor = totalDrawdownPct < MaxLossPct * 0.5 ? clrLime :
                         totalDrawdownPct < MaxLossPct * 0.7 ? clrYellow : clrRed;
-   CreateLabel("InfoPanel_TotalDDLbl", "Total DD:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_TotalDDLbl", "Total DD:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_TotalDDVal", DoubleToString(totalDrawdownPct, 2) + "% / " +
                DoubleToString(MaxLossPct * 100, 1) + "%",
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, totalDDColor, 8, "Arial");
+               xOffset, yOffset + (line++ * lineHeight) + 8, totalDDColor, 8, "Arial");
 
    line++; // Skip line
 
    //--- Trades today
-   CreateLabel("InfoPanel_TradesLbl", "Trades:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_TradesLbl", "Trades:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_TradesVal", IntegerToString(TradesToday) + " / " + IntegerToString(MaxTradesPerDay),
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
+               xOffset, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
    //--- Open positions
-   CreateLabel("InfoPanel_PosLbl", "Open Pos:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_PosLbl", "Open Pos:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_PosVal", IntegerToString(openPositions),
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
+               xOffset, yOffset + (line++ * lineHeight) + 8, clrAqua, 8, "Arial");
 
    //--- Spread
    color spreadColor = spread <= MaxSpreadPoints * 0.7 ? clrLime :
                        spread <= MaxSpreadPoints ? clrYellow : clrRed;
-   CreateLabel("InfoPanel_SpreadLbl", "Spread:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_SpreadLbl", "Spread:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_SpreadVal", DoubleToString(spread, 1) + " / " + IntegerToString(MaxSpreadPoints) + " pts",
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, spreadColor, 8, "Arial");
+               xOffset, yOffset + (line++ * lineHeight) + 8, spreadColor, 8, "Arial");
 
    line++; // Skip line
 
    //--- Session status
-   CreateLabel("InfoPanel_SessionLbl", "Session:", xOffset, yOffset + (line * lineHeight) + 8,
+   CreateLabel("InfoPanel_SessionLbl", "Session:", xOffset + 180, yOffset + (line * lineHeight) + 8,
                clrWhite, 8, "Arial");
    CreateLabel("InfoPanel_SessionVal", inSession ? "ACTIVE" : "CLOSED",
-               xOffset + 180, yOffset + (line++ * lineHeight) + 8, inSession ? clrLime : clrGray, 8, "Arial Bold");
+               xOffset, yOffset + (line++ * lineHeight) + 8, inSession ? clrLime : clrGray, 8, "Arial Bold");
 
    //--- Redraw chart
    ChartRedraw(0);

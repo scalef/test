@@ -701,7 +701,7 @@ void UpdateInfoPanel()
    int xOffset = 10;
    int yOffset = 20;
    int lineHeight = 18;
-   int panelWidth = 300;
+   int panelWidth = 240;
    int panelHeight = 290;
 
    //--- Create background panel

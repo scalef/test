@@ -622,7 +622,7 @@ void CreateInfoPanel()
    ObjectSetInteger(0, bgName, OBJPROP_BORDER_TYPE, BORDER_FLAT);
    ObjectSetInteger(0, bgName, OBJPROP_COLOR, clrWhite);
    ObjectSetInteger(0, bgName, OBJPROP_BACK, false);
-   ObjectSetInteger(0, bgName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+   ObjectSetInteger(0, bgName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
 
    // Create labels
    string labels[] = {
@@ -640,7 +640,7 @@ void CreateInfoPanel()
       ObjectSetInteger(0, labelName, OBJPROP_COLOR, clrWhite);
       ObjectSetInteger(0, labelName, OBJPROP_FONTSIZE, 8);
       ObjectSetString(0, labelName, OBJPROP_FONT, "Consolas");
-      ObjectSetInteger(0, labelName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
+      ObjectSetInteger(0, labelName, OBJPROP_CORNER, CORNER_LEFT_UPPER);
       ObjectSetString(0, labelName, OBJPROP_TEXT, labels[i] + ": Loading...");
    }
 }

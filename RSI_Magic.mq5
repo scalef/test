@@ -330,12 +330,11 @@ void CheckForEntry()
    // Get RSI values
    double rsi[];
    ArraySetAsSeries(rsi, true);
-   if(CopyBuffer(rsiHandle, 0, 0, 3) < 3)
+   if(CopyBuffer(rsiHandle, 0, 0, 3, rsi) < 3)
    {
       Print("ERROR: Failed to copy RSI buffer");
       return;
    }
-   CopyBuffer(rsiHandle, 0, 0, 3, rsi);
 
    double rsi1 = rsi[1];
    double rsi2 = rsi[2];
@@ -346,13 +345,9 @@ void CheckForEntry()
    ArraySetAsSeries(low, true);
    ArraySetAsSeries(close, true);
 
-   if(CopyHigh(_Symbol, PERIOD_M1, 0, 3) < 3) return;
-   if(CopyLow(_Symbol, PERIOD_M1, 0, 3) < 3) return;
-   if(CopyClose(_Symbol, PERIOD_M1, 0, 3) < 3) return;
-
-   CopyHigh(_Symbol, PERIOD_M1, 0, 3, high);
-   CopyLow(_Symbol, PERIOD_M1, 0, 3, low);
-   CopyClose(_Symbol, PERIOD_M1, 0, 3, close);
+   if(CopyHigh(_Symbol, PERIOD_M1, 0, 3, high) < 3) return;
+   if(CopyLow(_Symbol, PERIOD_M1, 0, 3, low) < 3) return;
+   if(CopyClose(_Symbol, PERIOD_M1, 0, 3, close) < 3) return;
 
    // Check for SELL signal: RSI[1] > Overbought AND RSI[2] <= Overbought
    if(rsi1 > RSI_Overbought && rsi2 <= RSI_Overbought)
@@ -676,9 +671,8 @@ void UpdateInfoPanel()
    double rsi[];
    ArraySetAsSeries(rsi, true);
    double rsi1 = 0;
-   if(CopyBuffer(rsiHandle, 0, 0, 2) >= 2)
+   if(CopyBuffer(rsiHandle, 0, 0, 2, rsi) >= 2)
    {
-      CopyBuffer(rsiHandle, 0, 0, 2, rsi);
       rsi1 = rsi[1];
    }
 
@@ -703,11 +697,10 @@ void UpdateInfoPanel()
    if(CanTrade(whyNot))
    {
       double rsi2Val = 0;
-      if(CopyBuffer(rsiHandle, 0, 0, 3) >= 3)
+      double rsiArr[];
+      ArraySetAsSeries(rsiArr, true);
+      if(CopyBuffer(rsiHandle, 0, 0, 3, rsiArr) >= 3)
       {
-         double rsiArr[];
-         ArraySetAsSeries(rsiArr, true);
-         CopyBuffer(rsiHandle, 0, 0, 3, rsiArr);
          rsi1 = rsiArr[1];
          rsi2Val = rsiArr[2];
 

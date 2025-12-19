@@ -447,8 +447,8 @@ void OnTick()
    bool buySignal = false;
    if(trendDirection >= 0) // Bullish or no filter
    {
-      // Pullback reclaim: Close[2] was below EMA20, Close[1] broke above EMA20
-      bool pullbackReclaim = (close[2] < ema_m5[2]) && (close[1] > ema_m5[1]);
+      // Pullback reclaim: Low[2] touched below EMA20, Close[1] broke above EMA20
+      bool pullbackReclaim = (low[2] < ema_m5[2]) && (close[1] > ema_m5[1]);
 
       // Micro breakout confirmation: Close[1] > High[2]
       bool microBreakout = (close[1] > high[2]);
@@ -460,8 +460,8 @@ void OnTick()
    bool sellSignal = false;
    if(trendDirection <= 0) // Bearish or no filter
    {
-      // Pullback reclaim: Close[2] was above EMA20, Close[1] broke below EMA20
-      bool pullbackReclaim = (close[2] > ema_m5[2]) && (close[1] < ema_m5[1]);
+      // Pullback reclaim: High[2] touched above EMA20, Close[1] broke below EMA20
+      bool pullbackReclaim = (high[2] > ema_m5[2]) && (close[1] < ema_m5[1]);
 
       // Micro breakout confirmation: Close[1] < Low[2]
       bool microBreakout = (close[1] < low[2]);
@@ -964,12 +964,12 @@ void UpdateInfoPanel()
       canAnalyze = true;
 
       //--- Check BUY conditions
-      bool buyPullbackReclaim = (close[2] < ema_m5[2]) && (close[1] > ema_m5[1]);
+      bool buyPullbackReclaim = (low[2] < ema_m5[2]) && (close[1] > ema_m5[1]);
       bool buyMicroBreakout = (close[1] > high[2]);
       bool buySignal = buyPullbackReclaim && buyMicroBreakout;
 
       //--- Check SELL conditions
-      bool sellPullbackReclaim = (close[2] > ema_m5[2]) && (close[1] < ema_m5[1]);
+      bool sellPullbackReclaim = (high[2] > ema_m5[2]) && (close[1] < ema_m5[1]);
       bool sellMicroBreakout = (close[1] < low[2]);
       bool sellSignal = sellPullbackReclaim && sellMicroBreakout;
 

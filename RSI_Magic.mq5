@@ -14,6 +14,7 @@
 input group "Money Management"
 input double   RiskPercent          = 1.0;       // Risk per trade (% of equity)
 input double   RR                   = 1.5;       // Risk/Reward ratio
+input double   MaxLots              = 10.0;      // Max lots per trade
 input ulong    MagicNumber          = 777001;    // Magic Number
 input int      MaxSpreadPoints      = 30;        // Max spread (points)
 input int      SlippagePoints       = 10;        // Slippage (points)
@@ -27,6 +28,7 @@ input double   RSI_Oversold         = 10.0;      // RSI Oversold level
 //--- Entry/Exit
 input group "Entry/Exit"
 input double   SL_Buffer_Price      = 0.10;      // SL Buffer (price, e.g. 0.10 for XAU)
+input double   MinSL_Price          = 0.50;      // Min SL distance (price, e.g. 0.50 for XAU)
 input int      MaxBarsInTrade       = 3;         // Max bars in trade (time stop)
 input bool     OneTradeAtATime      = true;      // One trade at a time
 
@@ -496,7 +498,85 @@ bool HasOpenPosition()
 //+------------------------------------------------------------------+
 void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
 {
-   // Calculate lot size based on risk
+   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+
+   // Normalize prices
+   entry = NormalizeDouble(entry, digits);
+   sl = NormalizeDouble(sl, digits);
+   tp = NormalizeDouble(tp, digits);
+
+   // Calculate minimum stop level and extra buffer
+   long stopsLevel = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+   long spread = SymbolInfoInteger(_Symbol, SYMBOL_SPREAD);
+   double minStop = stopsLevel * point;
+   double extra = (spread * point) + 2 * point;
+   double minDistance = minStop + extra;
+
+   // Calculate actual distances
+   double distSL = 0, distTP = 0;
+   if(orderType == ORDER_TYPE_BUY)
+   {
+      distSL = entry - sl;
+      distTP = tp - entry;
+   }
+   else if(orderType == ORDER_TYPE_SELL)
+   {
+      distSL = sl - entry;
+      distTP = entry - tp;
+   }
+
+   // Validate MinSL_Price
+   if(MathAbs(entry - sl) < MinSL_Price)
+   {
+      Print("TRADE REJECTED: SL distance < MinSL_Price");
+      Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+      Print("  SL_Distance: ", DoubleToString(MathAbs(entry - sl), digits), " MinSL_Price: ", MinSL_Price);
+      return;
+   }
+
+   // Validate SL direction and distance
+   if(orderType == ORDER_TYPE_BUY && (sl >= entry || distSL < minDistance))
+   {
+      Print("TRADE REJECTED: Invalid BUY stops");
+      Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+      Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
+      Print("  minStop: ", DoubleToString(minStop, digits), " spread: ", DoubleToString(spread * point, digits), " minDistance: ", DoubleToString(minDistance, digits));
+      return;
+   }
+
+   if(orderType == ORDER_TYPE_SELL && (sl <= entry || distSL < minDistance))
+   {
+      Print("TRADE REJECTED: Invalid SELL stops");
+      Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+      Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
+      Print("  minStop: ", DoubleToString(minStop, digits), " spread: ", DoubleToString(spread * point, digits), " minDistance: ", DoubleToString(minDistance, digits));
+      return;
+   }
+
+   // Validate TP direction and distance (if TP is set)
+   if(tp > 0)
+   {
+      if(orderType == ORDER_TYPE_BUY && (tp <= entry || distTP < minDistance))
+      {
+         Print("TRADE REJECTED: Invalid BUY TP");
+         Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+         Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
+         Print("  minDistance: ", DoubleToString(minDistance, digits));
+         return;
+      }
+
+      if(orderType == ORDER_TYPE_SELL && (tp >= entry || distTP < minDistance))
+      {
+         Print("TRADE REJECTED: Invalid SELL TP");
+         Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+         Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
+         Print("  minDistance: ", DoubleToString(minDistance, digits));
+         return;
+      }
+   }
+
+   // Calculate lot size
    double lots = CalculateLotSize(orderType, entry, sl);
    if(lots <= 0)
    {
@@ -504,30 +584,95 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
       return;
    }
 
-   // Normalize prices
-   int digits = (int)SymbolInfoInteger(_Symbol, SYMBOL_DIGITS);
-   sl = NormalizeDouble(sl, digits);
-   tp = NormalizeDouble(tp, digits);
-
-   // Open position
+   // Open position WITHOUT SL/TP
    bool result = false;
+   string comment = (orderType == ORDER_TYPE_BUY) ? "RSI_Magic_BUY" : "RSI_Magic_SELL";
+
    if(orderType == ORDER_TYPE_BUY)
    {
-      result = trade.Buy(lots, _Symbol, 0, sl, tp, "RSI_Magic_BUY");
+      result = trade.Buy(lots, _Symbol, 0, 0, 0, comment);
    }
    else if(orderType == ORDER_TYPE_SELL)
    {
-      result = trade.Sell(lots, _Symbol, 0, sl, tp, "RSI_Magic_SELL");
+      result = trade.Sell(lots, _Symbol, 0, 0, 0, comment);
    }
 
-   if(result)
-   {
-      Print("Trade opened: ", EnumToString(orderType), " Lots: ", lots, " SL: ", sl, " TP: ", tp);
-   }
-   else
+   if(!result)
    {
       Print("ERROR: Failed to open trade. Error: ", GetLastError());
       Print("Trade details: ", trade.ResultRetcode(), " - ", trade.ResultRetcodeDescription());
+      return;
+   }
+
+   // Get the ticket of the opened position
+   ulong ticket = trade.ResultOrder();
+   if(ticket == 0)
+      ticket = trade.ResultDeal();
+
+   Print("Trade opened: ", EnumToString(orderType), " Ticket: ", ticket, " Lots: ", lots);
+
+   // Wait a moment for the position to be fully registered
+   Sleep(100);
+
+   // Now modify the position with SL/TP using actual fill price
+   if(PositionSelectByTicket(ticket))
+   {
+      double fillPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+
+      // Recalculate SL/TP based on actual fill price if needed
+      // (or use original if they were calculated correctly)
+
+      MqlTradeRequest request = {};
+      MqlTradeResult result_mod = {};
+
+      request.action = TRADE_ACTION_SLTP;
+      request.position = ticket;
+      request.symbol = _Symbol;
+      request.sl = sl;
+      request.tp = tp;
+
+      if(OrderSend(request, result_mod))
+      {
+         Print("SL/TP set successfully: SL=", sl, " TP=", tp, " Fill price=", fillPrice);
+      }
+      else
+      {
+         Print("WARNING: Failed to set SL/TP. Retcode: ", result_mod.retcode, " - ", result_mod.comment);
+         Print("  Position will remain without SL/TP!");
+      }
+   }
+   else
+   {
+      // Try to find position by magic and symbol
+      for(int i = 0; i < PositionsTotal(); i++)
+      {
+         if(PositionGetTicket(i) > 0 &&
+            PositionGetString(POSITION_SYMBOL) == _Symbol &&
+            PositionGetInteger(POSITION_MAGIC) == MagicNumber)
+         {
+            ulong posTicket = PositionGetInteger(POSITION_TICKET);
+            double fillPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+
+            MqlTradeRequest request = {};
+            MqlTradeResult result_mod = {};
+
+            request.action = TRADE_ACTION_SLTP;
+            request.position = posTicket;
+            request.symbol = _Symbol;
+            request.sl = sl;
+            request.tp = tp;
+
+            if(OrderSend(request, result_mod))
+            {
+               Print("SL/TP set successfully: SL=", sl, " TP=", tp, " Fill price=", fillPrice);
+               break;
+            }
+            else
+            {
+               Print("WARNING: Failed to set SL/TP. Retcode: ", result_mod.retcode, " - ", result_mod.comment);
+            }
+         }
+      }
    }
 }
 
@@ -567,6 +712,10 @@ double CalculateLotSize(ENUM_ORDER_TYPE orderType, double entry, double sl)
    lots = MathFloor(lots / volumeStep) * volumeStep;
    lots = MathMax(lots, volumeMin);
    lots = MathMin(lots, volumeMax);
+
+   // Apply MaxLots cap
+   if(MaxLots > 0)
+      lots = MathMin(lots, MaxLots);
 
    return lots;
 }

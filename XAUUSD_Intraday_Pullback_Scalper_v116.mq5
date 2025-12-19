@@ -539,9 +539,37 @@ void OnTick()
       }
    }
 
+   //--- Update diagnostic HUD on new bar
+   UpdateDiagnosticHUD(IsInTradingSession(), spread, canOpenNewTrades, trendDirection, buySignal, sellSignal);
+
    //--- Update info panel
    if(ShowInfoPanel)
       UpdateInfoPanel();
+}
+
+//+------------------------------------------------------------------+
+//| Update diagnostic HUD (Comment display)                          |
+//+------------------------------------------------------------------+
+void UpdateDiagnosticHUD(bool inSession, double spread, bool canTrade, int trendDir, bool buySig, bool sellSig)
+{
+   //--- Get server time from TimeTradeServer()
+   MqlDateTime dt;
+   TimeToStruct(TimeTradeServer(), dt);
+   string serverTime = StringFormat("%02d:%02d", dt.hour, dt.min);
+
+   //--- Build HUD message
+   string hudMsg = StringFormat("ServerTime=%s | InSession=%d | Spread=%.1f | CanTrade=%d | TradesToday=%d | TrendDir=%d | BuySig=%d | SellSig=%d",
+                                serverTime,
+                                inSession ? 1 : 0,
+                                spread,
+                                canTrade ? 1 : 0,
+                                TradesToday,
+                                trendDir,
+                                buySig ? 1 : 0,
+                                sellSig ? 1 : 0);
+
+   //--- Display in chart comment
+   Comment(hudMsg);
 }
 
 //+------------------------------------------------------------------+

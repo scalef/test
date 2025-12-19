@@ -10,6 +10,13 @@
 
 #include <Trade\Trade.mqh>
 
+//--- Enums
+enum ENUM_STOP_MODE
+{
+   STOP_MODE_SKIP,    // Skip trade if stops invalid
+   STOP_MODE_WIDEN    // Auto-widen stops to minimum
+};
+
 //--- Money Management
 input group "Money Management"
 input double   RiskPercent          = 1.0;       // Risk per trade (% of equity)
@@ -21,16 +28,19 @@ input int      SlippagePoints       = 10;        // Slippage (points)
 
 //--- RSI
 input group "RSI"
-input int      RSI_Period           = 5;         // RSI Period
-input double   RSI_Overbought       = 90.0;      // RSI Overbought level
-input double   RSI_Oversold         = 10.0;      // RSI Oversold level
+input int                RSI_Period        = 5;           // RSI Period
+input ENUM_APPLIED_PRICE RSI_PriceApplied  = PRICE_CLOSE; // RSI Applied Price
+input double             RSI_Overbought    = 90.0;        // RSI Overbought level
+input double             RSI_Oversold      = 10.0;        // RSI Oversold level
+input bool               UseCrossSignal    = true;        // Use cross signal (true) or level signal (false)
 
 //--- Entry/Exit
 input group "Entry/Exit"
-input double   SL_Buffer_Price      = 0.10;      // SL Buffer (price, e.g. 0.10 for XAU)
-input double   MinSL_Price          = 0.50;      // Min SL distance (price, e.g. 0.50 for XAU)
-input int      MaxBarsInTrade       = 3;         // Max bars in trade (time stop)
-input bool     OneTradeAtATime      = true;      // One trade at a time
+input double         SL_Buffer_Price  = 0.00;      // SL Buffer (price, 0=exact High/Low)
+input double         MinSL_Price      = 0.50;      // Min SL distance (price, e.g. 0.50 for XAU)
+input ENUM_STOP_MODE StopMode         = STOP_MODE_SKIP; // Invalid stops handling
+input int            MaxBarsInTrade   = 3;         // Max bars in trade (time stop)
+input bool           OneTradeAtATime  = true;      // One trade at a time
 
 //--- Sessions
 input group "Sessions (Server Time)"
@@ -90,7 +100,7 @@ int OnInit()
    trade.SetAsyncMode(false);
 
    // Create RSI indicator
-   rsiHandle = iRSI(_Symbol, PERIOD_M1, RSI_Period, PRICE_CLOSE);
+   rsiHandle = iRSI(_Symbol, PERIOD_M1, RSI_Period, RSI_PriceApplied);
    if(rsiHandle == INVALID_HANDLE)
    {
       Print("ERROR: Failed to create RSI indicator");
@@ -341,7 +351,7 @@ void CheckForEntry()
    double rsi1 = rsi[1];
    double rsi2 = rsi[2];
 
-   // Get price data
+   // Get price data from signal candle (bar[1])
    double high[], low[], close[];
    ArraySetAsSeries(high, true);
    ArraySetAsSeries(low, true);
@@ -351,25 +361,78 @@ void CheckForEntry()
    if(CopyLow(_Symbol, PERIOD_M1, 0, 3, low) < 3) return;
    if(CopyClose(_Symbol, PERIOD_M1, 0, 3, close) < 3) return;
 
-   // Check for SELL signal: RSI[1] > Overbought AND RSI[2] <= Overbought
-   if(rsi1 > RSI_Overbought && rsi2 <= RSI_Overbought)
+   // Signal candle OHLC (bar[1])
+   double signalHigh = high[1];
+   double signalLow = low[1];
+   double signalClose = close[1];
+
+   bool sellSignal = false;
+   bool buySignal = false;
+
+   // Determine signal based on UseCrossSignal setting
+   if(UseCrossSignal)
+   {
+      // CROSS MODE: RSI crosses the threshold
+      // SELL: RSI[1] crosses ABOVE Overbought (RSI[2] <= OB AND RSI[1] > OB)
+      // BUY: RSI[1] crosses BELOW Oversold (RSI[2] >= OS AND RSI[1] < OS)
+      if(rsi2 <= RSI_Overbought && rsi1 > RSI_Overbought)
+         sellSignal = true;
+
+      if(rsi2 >= RSI_Oversold && rsi1 < RSI_Oversold)
+         buySignal = true;
+   }
+   else
+   {
+      // LEVEL MODE: RSI is at or beyond threshold
+      // SELL: RSI[1] >= Overbought
+      // BUY: RSI[1] <= Oversold
+      if(rsi1 >= RSI_Overbought)
+         sellSignal = true;
+
+      if(rsi1 <= RSI_Oversold)
+         buySignal = true;
+   }
+
+   // Get broker stop level requirements
+   long stopsLevel = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   double minStopDistance = stopsLevel * point;
+
+   // Process SELL signal
+   if(sellSignal)
    {
       double entry = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-      double sl = high[1] + SL_Buffer_Price;
-      double slDistance = sl - entry;
-      double tp = entry - (RR * slDistance);
+      double sl = signalHigh + SL_Buffer_Price;  // SL at High[1] + buffer
+      double R = sl - entry;  // Risk distance
+      double tp = entry - (RR * R);  // TP = Entry - RR * R
+
+      // Debug log
+      Print("=== SELL SIGNAL DETECTED ===");
+      Print("  Signal candle [1]: High=", signalHigh, " Low=", signalLow, " Close=", signalClose);
+      Print("  RSI[1]=", DoubleToString(rsi1, 2), " RSI[2]=", DoubleToString(rsi2, 2));
+      Print("  Entry=", entry, " SL=", sl, " TP=", tp);
+      Print("  R (risk)=", DoubleToString(R, _Digits), " RR=", RR);
+      Print("  StopsLevel=", stopsLevel, " MinStopDist=", DoubleToString(minStopDistance, _Digits));
 
       OpenTrade(ORDER_TYPE_SELL, entry, sl, tp);
       return;
    }
 
-   // Check for BUY signal: RSI[1] < Oversold AND RSI[2] >= Oversold
-   if(rsi1 < RSI_Oversold && rsi2 >= RSI_Oversold)
+   // Process BUY signal
+   if(buySignal)
    {
       double entry = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-      double sl = low[1] - SL_Buffer_Price;
-      double slDistance = entry - sl;
-      double tp = entry + (RR * slDistance);
+      double sl = signalLow - SL_Buffer_Price;  // SL at Low[1] - buffer
+      double R = entry - sl;  // Risk distance
+      double tp = entry + (RR * R);  // TP = Entry + RR * R
+
+      // Debug log
+      Print("=== BUY SIGNAL DETECTED ===");
+      Print("  Signal candle [1]: High=", signalHigh, " Low=", signalLow, " Close=", signalClose);
+      Print("  RSI[1]=", DoubleToString(rsi1, 2), " RSI[2]=", DoubleToString(rsi2, 2));
+      Print("  Entry=", entry, " SL=", sl, " TP=", tp);
+      Print("  R (risk)=", DoubleToString(R, _Digits), " RR=", RR);
+      Print("  StopsLevel=", stopsLevel, " MinStopDist=", DoubleToString(minStopDistance, _Digits));
 
       OpenTrade(ORDER_TYPE_BUY, entry, sl, tp);
       return;
@@ -526,7 +589,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
       distTP = entry - tp;
    }
 
-   // Validate MinSL_Price
+   // Validate MinSL_Price (always required, cannot widen)
    if(MathAbs(entry - sl) < MinSL_Price)
    {
       Print("TRADE REJECTED: SL distance < MinSL_Price");
@@ -535,23 +598,83 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
       return;
    }
 
-   // Validate SL direction and distance
-   if(orderType == ORDER_TYPE_BUY && (sl >= entry || distSL < minDistance))
+   // Store original SL/TP for logging
+   double originalSL = sl;
+   double originalTP = tp;
+   bool slAdjusted = false;
+   bool tpAdjusted = false;
+
+   // Validate and adjust SL if needed
+   if(orderType == ORDER_TYPE_BUY)
    {
-      Print("TRADE REJECTED: Invalid BUY stops");
-      Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
-      Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
-      Print("  minStop: ", DoubleToString(minStop, digits), " spread: ", DoubleToString(spread * point, digits), " minDistance: ", DoubleToString(minDistance, digits));
-      return;
+      if(sl >= entry)
+      {
+         Print("TRADE REJECTED: BUY SL must be below entry. SL=", sl, " Entry=", entry);
+         return;
+      }
+
+      if(distSL < minDistance)
+      {
+         if(StopMode == STOP_MODE_SKIP)
+         {
+            Print("TRADE REJECTED: BUY SL too close (SKIP mode)");
+            Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+            Print("  distSL: ", DoubleToString(distSL, digits), " minDistance: ", DoubleToString(minDistance, digits));
+            return;
+         }
+         else // STOP_MODE_WIDEN
+         {
+            sl = NormalizeDouble(entry - minDistance, digits);
+            distSL = entry - sl;
+            slAdjusted = true;
+            Print("SL WIDENED: ", originalSL, " -> ", sl, " (minDist=", DoubleToString(minDistance, digits), ")");
+         }
+      }
+   }
+   else if(orderType == ORDER_TYPE_SELL)
+   {
+      if(sl <= entry)
+      {
+         Print("TRADE REJECTED: SELL SL must be above entry. SL=", sl, " Entry=", entry);
+         return;
+      }
+
+      if(distSL < minDistance)
+      {
+         if(StopMode == STOP_MODE_SKIP)
+         {
+            Print("TRADE REJECTED: SELL SL too close (SKIP mode)");
+            Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+            Print("  distSL: ", DoubleToString(distSL, digits), " minDistance: ", DoubleToString(minDistance, digits));
+            return;
+         }
+         else // STOP_MODE_WIDEN
+         {
+            sl = NormalizeDouble(entry + minDistance, digits);
+            distSL = sl - entry;
+            slAdjusted = true;
+            Print("SL WIDENED: ", originalSL, " -> ", sl, " (minDist=", DoubleToString(minDistance, digits), ")");
+         }
+      }
    }
 
-   if(orderType == ORDER_TYPE_SELL && (sl <= entry || distSL < minDistance))
+   // Recalculate TP based on adjusted SL (maintain RR ratio)
+   if(slAdjusted)
    {
-      Print("TRADE REJECTED: Invalid SELL stops");
-      Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
-      Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
-      Print("  minStop: ", DoubleToString(minStop, digits), " spread: ", DoubleToString(spread * point, digits), " minDistance: ", DoubleToString(minDistance, digits));
-      return;
+      if(orderType == ORDER_TYPE_BUY)
+      {
+         double R = entry - sl;
+         tp = NormalizeDouble(entry + (RR * R), digits);
+         distTP = tp - entry;
+      }
+      else if(orderType == ORDER_TYPE_SELL)
+      {
+         double R = sl - entry;
+         tp = NormalizeDouble(entry - (RR * R), digits);
+         distTP = entry - tp;
+      }
+      tpAdjusted = true;
+      Print("TP RECALCULATED: ", originalTP, " -> ", tp, " (maintaining RR=", RR, ")");
    }
 
    // Validate TP direction and distance (if TP is set)
@@ -559,20 +682,38 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
    {
       if(orderType == ORDER_TYPE_BUY && (tp <= entry || distTP < minDistance))
       {
-         Print("TRADE REJECTED: Invalid BUY TP");
-         Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
-         Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
-         Print("  minDistance: ", DoubleToString(minDistance, digits));
-         return;
+         if(StopMode == STOP_MODE_SKIP)
+         {
+            Print("TRADE REJECTED: Invalid BUY TP (SKIP mode)");
+            Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+            Print("  distTP: ", DoubleToString(distTP, digits), " minDistance: ", DoubleToString(minDistance, digits));
+            return;
+         }
+         else // STOP_MODE_WIDEN
+         {
+            tp = NormalizeDouble(entry + minDistance, digits);
+            distTP = tp - entry;
+            tpAdjusted = true;
+            Print("TP WIDENED: ", originalTP, " -> ", tp);
+         }
       }
 
       if(orderType == ORDER_TYPE_SELL && (tp >= entry || distTP < minDistance))
       {
-         Print("TRADE REJECTED: Invalid SELL TP");
-         Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
-         Print("  distSL: ", DoubleToString(distSL, digits), " distTP: ", DoubleToString(distTP, digits));
-         Print("  minDistance: ", DoubleToString(minDistance, digits));
-         return;
+         if(StopMode == STOP_MODE_SKIP)
+         {
+            Print("TRADE REJECTED: Invalid SELL TP (SKIP mode)");
+            Print("  Entry: ", entry, " SL: ", sl, " TP: ", tp);
+            Print("  distTP: ", DoubleToString(distTP, digits), " minDistance: ", DoubleToString(minDistance, digits));
+            return;
+         }
+         else // STOP_MODE_WIDEN
+         {
+            tp = NormalizeDouble(entry - minDistance, digits);
+            distTP = entry - tp;
+            tpAdjusted = true;
+            Print("TP WIDENED: ", originalTP, " -> ", tp);
+         }
       }
    }
 

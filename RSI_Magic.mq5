@@ -85,6 +85,17 @@ int countHasPositionBlock = 0;
 int countNoSignalBlock = 0;
 datetime lastDailyReport = 0;
 
+//--- Close retry tracking
+struct CloseRetryInfo
+{
+   ulong ticket;
+   datetime lastAttempt;
+   int retries;
+};
+CloseRetryInfo closeRetries[];
+const int MAX_CLOSE_RETRIES = 3;
+const int CLOSE_RETRY_COOLDOWN = 5; // seconds
+
 //--- Panel objects
 string panelPrefix = "RSI_Magic_Panel_";
 
@@ -284,6 +295,126 @@ void CheckPropProtection()
 }
 
 //+------------------------------------------------------------------+
+//| Close position by ticket with retry logic                       |
+//+------------------------------------------------------------------+
+bool ClosePositionByTicket(ulong ticket, string reason = "CLOSE")
+{
+   // Check if position still exists
+   if(!PositionSelectByTicket(ticket))
+   {
+      Print("Position #", ticket, " already closed or doesn't exist");
+      return true; // Consider as success if already closed
+   }
+
+   // Verify symbol and magic
+   if(PositionGetString(POSITION_SYMBOL) != _Symbol)
+   {
+      Print("ERROR: Position #", ticket, " is not for current symbol");
+      return false;
+   }
+
+   if(PositionGetInteger(POSITION_MAGIC) != MagicNumber)
+   {
+      Print("ERROR: Position #", ticket, " has different magic number");
+      return false;
+   }
+
+   // Check retry cooldown
+   datetime now = TimeCurrent();
+   for(int i = 0; i < ArraySize(closeRetries); i++)
+   {
+      if(closeRetries[i].ticket == ticket)
+      {
+         // Check if in cooldown period
+         if(now - closeRetries[i].lastAttempt < CLOSE_RETRY_COOLDOWN)
+         {
+            Print("Close cooldown active for ticket #", ticket, " - waiting ",
+                  CLOSE_RETRY_COOLDOWN - (now - closeRetries[i].lastAttempt), " seconds");
+            return false;
+         }
+
+         // Check max retries
+         if(closeRetries[i].retries >= MAX_CLOSE_RETRIES)
+         {
+            Print("ERROR: Max close retries reached for ticket #", ticket);
+            return false;
+         }
+
+         // Update retry info
+         closeRetries[i].lastAttempt = now;
+         closeRetries[i].retries++;
+         break;
+      }
+   }
+
+   // If not in retry list, add it
+   bool found = false;
+   for(int i = 0; i < ArraySize(closeRetries); i++)
+   {
+      if(closeRetries[i].ticket == ticket)
+      {
+         found = true;
+         break;
+      }
+   }
+
+   if(!found)
+   {
+      int size = ArraySize(closeRetries);
+      ArrayResize(closeRetries, size + 1);
+      closeRetries[size].ticket = ticket;
+      closeRetries[size].lastAttempt = now;
+      closeRetries[size].retries = 1;
+   }
+
+   // Get position info before closing
+   string symbol = PositionGetString(POSITION_SYMBOL);
+   ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
+   double volume = PositionGetDouble(POSITION_VOLUME);
+
+   Print("Attempting to close position #", ticket, " (", EnumToString(posType), " ",
+         volume, " lots) - Reason: ", reason);
+
+   // Close the position
+   bool result = trade.PositionClose(ticket);
+
+   if(result)
+   {
+      // Verify position is actually closed
+      Sleep(100);
+      if(!PositionSelectByTicket(ticket))
+      {
+         Print("SUCCESS: Position #", ticket, " closed - ", reason);
+
+         // Remove from retry list
+         for(int i = 0; i < ArraySize(closeRetries); i++)
+         {
+            if(closeRetries[i].ticket == ticket)
+            {
+               // Shift array elements
+               for(int j = i; j < ArraySize(closeRetries) - 1; j++)
+                  closeRetries[j] = closeRetries[j + 1];
+               ArrayResize(closeRetries, ArraySize(closeRetries) - 1);
+               break;
+            }
+         }
+         return true;
+      }
+      else
+      {
+         Print("WARNING: Position #", ticket, " still exists after close attempt");
+         return false;
+      }
+   }
+   else
+   {
+      Print("ERROR: Failed to close position #", ticket, " - Retcode: ",
+            trade.ResultRetcode(), " - ", trade.ResultRetcodeDescription());
+      return false;
+   }
+}
+
+//+------------------------------------------------------------------+
 //| Check time stop for open positions                              |
 //+------------------------------------------------------------------+
 void CheckTimeStop()
@@ -302,17 +433,8 @@ void CheckTimeStop()
       int barIndex = iBarShift(_Symbol, PERIOD_M1, openTime);
       if(barIndex >= MaxBarsInTrade)
       {
-         double positionVolume = PositionGetDouble(POSITION_VOLUME);
-         ENUM_POSITION_TYPE posType = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-
-         bool closed = false;
-         if(posType == POSITION_TYPE_BUY)
-            closed = trade.Sell(positionVolume, _Symbol, 0, 0, 0, "TIME-STOP");
-         else
-            closed = trade.Buy(positionVolume, _Symbol, 0, 0, 0, "TIME-STOP");
-
-         if(closed)
-            Print("TIME-STOP close after ", barIndex, " bars. Ticket: ", ticket);
+         Print("TIME-STOP triggered: Position #", ticket, " open for ", barIndex, " bars (max: ", MaxBarsInTrade, ")");
+         ClosePositionByTicket(ticket, "TIME-STOP after " + IntegerToString(barIndex) + " bars");
       }
    }
 }
@@ -756,8 +878,12 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
    Sleep(100);
 
    // Now modify the position with SL/TP using actual fill price
+   bool slTpSetSuccessfully = false;
+   ulong finalTicket = 0;
+
    if(PositionSelectByTicket(ticket))
    {
+      finalTicket = ticket;
       double fillPrice = PositionGetDouble(POSITION_PRICE_OPEN);
 
       // Recalculate SL/TP based on actual fill price if needed
@@ -775,11 +901,12 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
       if(OrderSend(request, result_mod))
       {
          Print("SL/TP set successfully: SL=", sl, " TP=", tp, " Fill price=", fillPrice);
+         slTpSetSuccessfully = true;
       }
       else
       {
-         Print("WARNING: Failed to set SL/TP. Retcode: ", result_mod.retcode, " - ", result_mod.comment);
-         Print("  Position will remain without SL/TP!");
+         Print("ERROR: Failed to set SL/TP. Retcode: ", result_mod.retcode, " - ", result_mod.comment);
+         Print("ABORT: Closing unprotected position #", ticket);
       }
    }
    else
@@ -792,6 +919,7 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
             PositionGetInteger(POSITION_MAGIC) == MagicNumber)
          {
             ulong posTicket = PositionGetInteger(POSITION_TICKET);
+            finalTicket = posTicket;
             double fillPrice = PositionGetDouble(POSITION_PRICE_OPEN);
 
             MqlTradeRequest request = {};
@@ -806,14 +934,23 @@ void OpenTrade(ENUM_ORDER_TYPE orderType, double entry, double sl, double tp)
             if(OrderSend(request, result_mod))
             {
                Print("SL/TP set successfully: SL=", sl, " TP=", tp, " Fill price=", fillPrice);
+               slTpSetSuccessfully = true;
                break;
             }
             else
             {
-               Print("WARNING: Failed to set SL/TP. Retcode: ", result_mod.retcode, " - ", result_mod.comment);
+               Print("ERROR: Failed to set SL/TP. Retcode: ", result_mod.retcode, " - ", result_mod.comment);
+               Print("ABORT: Closing unprotected position #", posTicket);
             }
          }
       }
+   }
+
+   // CRITICAL: If SL/TP could not be set, close the position immediately
+   if(!slTpSetSuccessfully && finalTicket > 0)
+   {
+      Print("CRITICAL: Position opened without SL/TP protection - ABORTING");
+      ClosePositionByTicket(finalTicket, "ABORT - Failed to set SL/TP");
    }
 }
 
@@ -874,8 +1011,7 @@ void CloseAllPositions()
       if(PositionGetString(POSITION_SYMBOL) != _Symbol) continue;
       if(PositionGetInteger(POSITION_MAGIC) != MagicNumber) continue;
 
-      trade.PositionClose(ticket);
-      Print("Position closed by PROP protection. Ticket: ", ticket);
+      ClosePositionByTicket(ticket, "PROP PROTECTION");
    }
 }
 

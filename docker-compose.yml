@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./global-macro-trader/backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/trading.db
+      - TRADING_MODE=SIGNAL_ONLY
+      - ALLOW_LIVE_TRADING=false
+      - SCHEDULER_INTERVAL_SECONDS=300
+    volumes:
+      - db_data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./global-macro-trader/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Uncomment to use PostgreSQL instead of SQLite:
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_DB: trading
+  #     POSTGRES_USER: trader
+  #     POSTGRES_PASSWORD: changeme
+  #   volumes:
+  #     - pg_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #
+  # Then set in backend service:
+  # DATABASE_URL=postgresql+asyncpg://trader:changeme@postgres:5432/trading
+
+volumes:
+  db_data:
+  # pg_data:
